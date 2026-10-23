@@ -29,7 +29,10 @@ En haut à droite, l'indicateur du classeur affiche son nom et son état :
 | verte — *Enregistré à 14:32* | tout est écrit dans le classeur |
 | orange — *Modifications non enregistrées* | pensez à enregistrer |
 
-Si vous fermez l'onglet avec des modifications non enregistrées, le navigateur vous prévient.
+Tant que le contenu de l'application n'est pas enregistré dans le classeur :
+
+- en quittant un rapport (croix en haut à droite), l'application demande si vous êtes certain de vouloir fermer : *Annuler*, *Fermer sans enregistrer* ou *Enregistrer et fermer* ;
+- en fermant l'onglet ou la page du navigateur, le navigateur demande confirmation avant de quitter.
 
 Si l'enregistrement échoue, vérifiez que le classeur **n'est pas ouvert dans Excel** au même moment, puis recommencez.
 

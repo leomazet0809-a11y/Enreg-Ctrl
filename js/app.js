@@ -2471,7 +2471,8 @@ function fermerRapport(){
     modal('Rapport non enregistré',
       'Ce rapport ne peut pas rejoindre les rapports enregistrés tant qu\'il manque :'
       + '<ul>' + manque.map(function(c){ return '<li><b>' + esc(c.nom) + '</b></li>'; }).join('') + '</ul>'
-      + '<p style="margin:12px 0 0">Si vous fermez maintenant, il reste en brouillon : vous le retrouverez avec le bouton « Reprendre » de l\'écran Rapports enregistrés.</p>',
+      + '<p style="margin:12px 0 0">Si vous fermez maintenant, il reste en brouillon : vous le retrouverez avec le bouton « Reprendre » de l\'écran Rapports enregistrés.</p>'
+      + (estModifie() ? '<p style="margin:12px 0 0"><b style="color:var(--amber)">Le contenu de l\'application n\'est pas enregistré dans le classeur Excel.</b></p>' : ''),
       function(){ VIEW = 'historique'; render(); }, 'Fermer quand même');
     var ft = document.querySelector('.modal .ft');
     ft.innerHTML = '<button class="btn" data-x3>Compléter</button><button class="btn pri" data-ok3>Fermer quand même</button>';
@@ -2485,7 +2486,28 @@ function fermerRapport(){
     return;
   }
   enregistrerAuto(true);
+  if(estModifie()){ confirmerFermetureRapport(); return; }
   VIEW = 'historique'; render();
+}
+/* Contenu non enregistré dans le classeur Excel : confirmation avant de quitter le rapport */
+function confirmerFermetureRapport(){
+  modal('Modifications non enregistrées',
+    '<p style="margin:0">Le contenu de l\'application <b>n\'est pas enregistré dans le classeur Excel</b>.</p>'
+    + '<p style="margin:10px 0 0">Êtes-vous certain de vouloir fermer le rapport ?</p>',
+    function(){}, 'Annuler');
+  var ft = document.querySelector('.modal .ft');
+  ft.innerHTML = '<button class="btn" data-annuler>Annuler</button>'
+    + '<button class="btn" data-fermer>Fermer sans enregistrer</button>'
+    + '<button class="btn pri" data-enreg>Enregistrer et fermer</button>';
+  function fermerModal(){ var m = document.querySelector('.modal'); if(m) m.remove(); }
+  ft.querySelector('[data-annuler]').onclick = fermerModal;
+  ft.querySelector('[data-fermer]').onclick = function(){ fermerModal(); VIEW = 'historique'; render(); };
+  ft.querySelector('[data-enreg]').onclick = async function(){
+    fermerModal();
+    await enregistrer();
+    if(!estModifie() && VIEW === 'rapport'){ VIEW = 'historique'; render(); }
+  };
+  ft.querySelector('[data-enreg]').focus();
 }
 
 function bindHistorique(){

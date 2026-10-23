@@ -587,8 +587,11 @@ var LOGO = '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><
   }, true);
   window.addEventListener('focus', function(){ synchroniserFichier(false); });
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') synchroniserFichier(false); });
+  /* fermeture de l'onglet ou de la page avec un contenu non enregistré dans le classeur :
+     le navigateur demande confirmation (son message est standard, il ne peut pas être personnalisé) */
   window.addEventListener('beforeunload', function(e){
-    if(CLASSEUR.modifie){ e.preventDefault(); e.returnValue = ''; }
+    if(typeof autoT !== 'undefined' && autoT){ clearTimeout(autoT); if(VIEW === 'rapport' && R) enregistrerAuto(true); }
+    if(CLASSEUR.modifie){ e.preventDefault(); e.returnValue = 'Le contenu n\'est pas enregistré dans le classeur Excel. Êtes-vous certain de vouloir fermer ?'; return e.returnValue; }
   });
 
   majBarreFichier();
