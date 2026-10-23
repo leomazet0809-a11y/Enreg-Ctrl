@@ -464,6 +464,17 @@ function ncParPiece(j){
 }
 /* Saisie validée : le séparateur décimal est toujours la virgule */
 function virgule(v){ return String(v === null || v === undefined ? '' : v).replace(/\./g, ','); }
+/* Valeur mesurée affichée avec virgule et au moins deux décimales (13 -> 13,00 ; 13,5 -> 13,50).
+   Les décimales supplémentaires saisies sont conservées (13,025 reste 13,025). */
+function formatMesure(v){
+  var s = virgule(v).trim();
+  if(/^[-+]?,\d+$/.test(s)) s = s.replace(',', '0,');
+  var m = /^([-+]?\d+)(?:,(\d*))?$/.exec(s);
+  if(!m) return s;                                  // texte non numérique : laissé tel quel
+  var dec = m[2] || '';
+  while(dec.length < 2) dec += '0';
+  return m[1] + ',' + dec;
+}
 function ncParLigne(i){
   var c = 0, n = nbPieces();
   for(var j=0;j<n;j++) if(mesureStatut(i,j) === 'out') c++;
@@ -1239,7 +1250,7 @@ function viewRapport(){
             var cls = v==='1'||v===1 ? 'v1' : (v==='0'||v===0 ? 'v0' : '');
             h += '<td class="mes '+st+'" data-r="'+i+'" data-c="'+k+'"><button class="q '+cls+'" data-r="'+i+'" data-c="'+k+'"'+dis+'>'+(cls==='v1'?'OK':cls==='v0'?'NOK':'–')+'</button></td>';
           } else {
-            h += '<td class="mes '+st+'" data-r="'+i+'" data-c="'+k+'"><input inputmode="decimal" data-r="'+i+'" data-c="'+k+'" value="'+esc(virgule(v))+'"'+dis+'></td>';
+            h += '<td class="mes '+st+'" data-r="'+i+'" data-c="'+k+'"><input inputmode="decimal" data-r="'+i+'" data-c="'+k+'" value="'+esc(formatMesure(v))+'"'+dis+'></td>';
           }
         }
         h += '</tr>';
@@ -1473,7 +1484,7 @@ function analyseOut(){
       + '<td class="bn">'+(r.nom===null||r.nom===undefined?'—':fmt(r.nom))+'</td>'
       + '<td class="bn">'+(r.tolP===null||r.tolP===undefined?'—':fmt(r.tolP))+'</td>'
       + '<td class="bn">'+(r.maxi===null||r.maxi===undefined?'—':fmt(r.maxi))+'</td>'
-      + '<td class="bn" style="font-weight:700'+(hors?';color:var(--nc)':'')+'">'+fmt(r.valeur)+'</td>'
+      + '<td class="bn" style="font-weight:700'+(hors?';color:var(--nc)':'')+'">'+formatMesure(Math.round(r.valeur*1e6)/1e6)+'</td>'
       + '<td class="rv"><b>'+(r.gamRev===null||r.gamRev===undefined?'—':r.gamRev)+'</b></td>'
       + '<td class="rv"><b>'+(r.tsRev===null||r.tsRev===undefined?'—':r.tsRev)+'</b></td></tr>';
   });
@@ -2289,7 +2300,7 @@ function bindRapport(){
     };
     /* à la validation de la cellule (Entrée, Tab, clic ailleurs) : points -> virgules */
     inp.onchange = function(){
-      var v = virgule(inp.value);
+      var v = formatMesure(inp.value);
       if(v === inp.value) return;
       inp.value = v;
       R.mesures[+inp.dataset.r][+inp.dataset.c] = v;

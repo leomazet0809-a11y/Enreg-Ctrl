@@ -249,7 +249,14 @@ function nombreOuTexte(v){ var n = num(v); return isNaN(n) ? (v || '') : n; }
 function construireClasseur(){
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, feuille(tableauRapports()), 'Rapports');
-  XLSX.utils.book_append_sheet(wb, feuille(tableauMesures()), 'Mesures');
+  var wsm = feuille(tableauMesures());
+  /* valeurs mesurées affichées avec deux décimales dans Excel aussi */
+  for(var lig = 1; ; lig++){
+    var ref = XLSX.utils.encode_cell({r:lig, c:11});
+    if(!wsm[ref]){ if(!wsm[XLSX.utils.encode_cell({r:lig, c:0})]) break; continue; }
+    if(wsm[ref].t === 'n') wsm[ref].z = '0.00';
+  }
+  XLSX.utils.book_append_sheet(wb, wsm, 'Mesures');
   XLSX.utils.book_append_sheet(wb, feuille(tableauGamserie()), 'GAMSERIE');
   XLSX.utils.book_append_sheet(wb, feuille(tableauTS()), 'TS');
   XLSX.utils.book_append_sheet(wb, feuille(tableauMatrice()), 'Matrice');
