@@ -11,7 +11,16 @@
      et un onglet masqué « _Donnees » qui fait foi au rechargement.
    ======================================================================= */
 
-var CLASSEUR = {handle:null, nom:'', enregistreLe:'', modifie:false, ecritureEnCours:false};
+var CLASSEUR = {handle:null, nom:'', enregistreLe:'', modifie:false, ecritureEnCours:false,
+                dateFichier:0,   // date de modification du fichier lors du dernier chargement / enregistrement
+                autres:[]};      // onglets ajoutés par l'utilisateur, conservés à l'enregistrement
+/* Onglets modifiables dans Excel et repris par l'application (ordre d'intégration) */
+var FEUILLES_EDITABLES = [
+  {base:'matrice',  feuille:'Matrice',  tableau:function(){ return tableauMatrice(); }},
+  {base:'gamserie', feuille:'GAMSERIE', tableau:function(){ return tableauGamserie(); }},
+  {base:'ts',       feuille:'TS',       tableau:function(){ return tableauTS(); }}
+];
+var FEUILLES_APPLI = ['Rapports','Mesures','GAMSERIE','TS','Matrice','Journal','Mode d\'emploi', '_Donnees'];
 var CHARGEMENT = false;   // pendant le chargement, les écritures ne comptent pas comme modifications
 var CLES_DONNEES = ['rc.db','rc.versions','rc.revisions','rc.journal','rc.docs','rc.reports','rc.draft'];
 var FEUILLE_DONNEES = '_Donnees';
@@ -98,7 +107,12 @@ async function autorisation(handle, demander){
 function lireClasseur(buf){
   var wb = XLSX.read(buf, {type:'array'});
   var ws = wb.Sheets[FEUILLE_DONNEES];
-  if(!ws) throw new Error('Ce classeur n\'a pas été créé par l\'application (onglet « ' + FEUILLE_DONNEES + ' » absent).');
+  if(!ws){
+    /* Classeur préparé à la main : on part de bases vides et on reprend ses onglets */
+    var aBases = FEUILLES_EDITABLES.some(function(f){ return wb.Sheets[f.feuille]; });
+    if(!aBases) throw new Error('Ce classeur ne contient ni les données de l\'application (onglet « ' + FEUILLE_DONNEES + ' ») ni d\'onglet GAMSERIE, TS ou Matrice.');
+    return {mem:{'rc.db':JSON.stringify({gamserie:[], ts:[], matrice:[]})}, wb:wb, neuf:true};
+  }
   var lignes = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
   var parts = {};
   for(var i=1;i<lignes.length;i++){
@@ -111,7 +125,58 @@ function lireClasseur(buf){
     mem[c] = parts[c].join('');
     JSON.parse(mem[c]);   // contrôle d'intégrité : lève une erreur si le contenu a été altéré
   }
-  return mem;
+  return {mem:mem, wb:wb, neuf:false};
+}
+
+/* ---------- reprise des onglets modifiés dans Excel ---------- */
+function lignesFeuille(ws){
+  return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:'', blankrows:false});
+}
+/* Forme comparable d'un tableau : textes rognés, nombres arrondis, vides de fin retirés */
+function empreinte(rows){
+  return JSON.stringify(rows.map(function(r){
+    var a = r.map(function(v){
+      if(typeof v === 'number') return String(Math.round(v * 1e9) / 1e9);
+      return String(v === null || v === undefined ? '' : v).trim();
+    });
+    while(a.length && a[a.length-1] === '') a.pop();
+    return a;
+  }).filter(function(r){ return r.length; }));
+}
+/* Compare chaque onglet modifiable du classeur à ce que l'application aurait
+   écrit ; un onglet différent a été modifié dans Excel et remplace la base.
+   tout = true : reprend tous les onglets présents (classeur préparé à la main). */
+function integrerFeuillesExcel(wb, tout){
+  var bilan = {bases:[], revisions:0, ignores:[], erreurs:[]};
+  /* les tableaux de référence sont calculés avant toute intégration (TS dépend de la matrice et de GAMSERIE) */
+  var refs = FEUILLES_EDITABLES.map(function(f){ return wb.Sheets[f.feuille] ? empreinte(lignesFeuille(feuille(f.tableau()))) : null; });
+  FEUILLES_EDITABLES.forEach(function(f, i){
+    var ws = wb.Sheets[f.feuille]; if(!ws) return;
+    var rows = lignesFeuille(ws);
+    if(!tout && empreinte(rows) === refs[i]) return;
+    if(rows.length < 2){ bilan.ignores.push(f.feuille); return; }   // onglet vidé : on ne remplace pas la base par du vide
+    try{
+      bilan.revisions += importerTableau(f.base, rows, 'remplacer', 'Modifié dans Excel');
+      bilan.bases.push(f.feuille);
+    }catch(e){ bilan.erreurs.push(f.feuille + ' : ' + (e.message || e)); }
+  });
+  if(bilan.bases.length){ syncLignes(); saveDraft(); }
+  return bilan;
+}
+function messageBilan(bilan){
+  var h = '';
+  if(bilan.bases.length){
+    h += '<p style="margin:0">Données reprises depuis Excel : <b>' + bilan.bases.map(esc).join(', ') + '</b>.</p>';
+    if(bilan.revisions) h += '<p style="margin:10px 0 0"><b>' + bilan.revisions + ' révision' + (bilan.revisions>1?'s':'') + ' en brouillon</b> : '
+      + 'les gammes ou valeurs modifiées ne s\'appliquent aux nouveaux rapports qu\'après validation dans <b>Paramètres → GAMSERIE / TS</b> (bouton « Valider les brouillons »).</p>';
+    h += '<p style="margin:10px 0 0">Enregistrez (<b>Ctrl + S</b>) pour mettre le classeur à jour.</p>';
+  }
+  if(bilan.ignores.length) h += '<p style="margin:10px 0 0">Onglet vide ignoré : ' + bilan.ignores.map(esc).join(', ') + '.</p>';
+  if(bilan.erreurs.length) h += '<p style="margin:10px 0 0;color:var(--nc)">Non repris : ' + bilan.erreurs.map(esc).join(' · ') + '</p>';
+  return h;
+}
+function feuillesUtilisateur(wb){
+  return wb.SheetNames.filter(function(n){ return FEUILLES_APPLI.indexOf(n) < 0; }).map(function(n){ return [n, wb.Sheets[n]]; });
 }
 
 /* ---------- construction du classeur ---------- */
@@ -185,6 +250,8 @@ function construireClasseur(){
   XLSX.utils.book_append_sheet(wb, feuille(tableauTS()), 'TS');
   XLSX.utils.book_append_sheet(wb, feuille(tableauMatrice()), 'Matrice');
   XLSX.utils.book_append_sheet(wb, feuille(tableauJournal()), 'Journal');
+  XLSX.utils.book_append_sheet(wb, feuilleModeEmploi(), 'Mode d\'emploi');
+  CLASSEUR.autres.forEach(function(x){ XLSX.utils.book_append_sheet(wb, x[1], x[0]); });
 
   /* Données de l'application, découpées en parts de 30 000 caractères */
   var aoa = [['Clé','Partie','Contenu (ne pas modifier)']];
@@ -207,6 +274,89 @@ function construireClasseur(){
   wb.Workbook = {Sheets: wb.SheetNames.map(function(n){ return {name:n, Hidden: n === FEUILLE_DONNEES ? 1 : 0}; })};
   wb.Props = {Title:'Enregistrements Contrôles', Application:'Enregistrements Contrôles'};
   return XLSX.write(wb, {bookType:'xlsx', type:'array', compression:true});
+}
+
+function feuilleModeEmploi(){
+  var ws = XLSX.utils.aoa_to_sheet([
+    ['Enregistrements Contrôles — mode d\'emploi du classeur'],
+    [''],
+    ['Onglet', 'Modifiable dans Excel', 'Contenu'],
+    ['GAMSERIE', 'Oui', 'Gammes de contrôle : une ligne par famille + code (Famille Méthode, Code, Criticité, Spécification, Moyen, Méthode).'],
+    ['TS', 'Oui', 'Valeurs par article : une ligne par article + code (Nominal, Tol -, Tol +, Type spéc. = Générale / Individuelle). Mini et Maxi sont recalculés.'],
+    ['Matrice', 'Oui', 'Article, code fournisseur, famille, matière, liasse et références documentaires.'],
+    ['Rapports', 'Non', 'Liste des rapports enregistrés (saisie dans l\'application).'],
+    ['Mesures', 'Non', 'Toutes les valeurs relevées.'],
+    ['Journal', 'Non', 'Historique des révisions.'],
+    [''],
+    ['Les colonnes Révision, Date de révision, Statut, Spécification (TS), Type saisie, Mini. et Maxi. sont informatives : elles sont recalculées par l\'application.'],
+    ['Une gamme ou des valeurs modifiées dans Excel ouvrent une révision en brouillon, à valider dans l\'application avant de servir aux nouveaux rapports.'],
+    ['Enregistrez et fermez le classeur dans Excel avant d\'enregistrer depuis l\'application. Vos propres onglets supplémentaires sont conservés (sans mise en forme).'],
+    ['Ne modifiez pas l\'onglet masqué « _Donnees ».']
+  ]);
+  ws['!cols'] = [{wch:16},{wch:22},{wch:120}];
+  return ws;
+}
+
+/* ---------- modifications faites dans Excel pendant que l'application est ouverte ---------- */
+var verifEnCours = false;
+async function dateFichier(h){ try{ return (await h.getFile()).lastModified; }catch(e){ return 0; } }
+/* Renvoie true si l'on peut poursuivre (pas de modification externe, ou choix fait). */
+async function verifierModifExterne(avantEcriture){
+  var h = CLASSEUR.handle;
+  if(!h || verifEnCours || CLASSEUR.ecritureEnCours) return true;
+  var acc = document.getElementById('accueil'); if(acc && !acc.hidden) return true;
+  if(!(await autorisation(h, false))) return true;
+  verifEnCours = true;
+  try{
+    var f = await h.getFile();
+    if(!CLASSEUR.dateFichier || f.lastModified === CLASSEUR.dateFichier) return true;
+    if(!CLASSEUR.modifie && !avantEcriture){
+      await chargerDepuisHandle(h, true);   // rien à perdre : rechargement complet
+      return false;
+    }
+    return await choixConflit(h, f);
+  }catch(e){ return true; }
+  finally{ verifEnCours = false; }
+}
+function choixConflit(h, f){
+  return new Promise(function(res){
+    modal('Classeur modifié dans Excel',
+      'Le classeur <b>' + esc(h.name) + '</b> a été modifié en dehors de l\'application.'
+      + '<ul><li><b>Intégrer les modifications Excel</b> : reprend les onglets GAMSERIE, TS et Matrice du fichier, en gardant vos rapports en cours.</li>'
+      + '<li><b>Garder la version de l\'application</b> : les modifications faites dans Excel seront écrasées au prochain enregistrement.</li></ul>',
+      function(){}, 'Fermer');
+    var ft = document.querySelector('.modal .ft');
+    ft.innerHTML = '<button class="btn" data-garder>Garder la version de l\'application</button><button class="btn pri" data-integrer>Intégrer les modifications Excel</button>';
+    ft.querySelector('[data-garder]').onclick = function(){
+      document.querySelector('.modal').remove();
+      CLASSEUR.dateFichier = f.lastModified;
+      res(true);
+    };
+    ft.querySelector('[data-integrer]').onclick = async function(){
+      document.querySelector('.modal').remove();
+      try{
+        var lu = lireClasseur(await f.arrayBuffer());
+        CLASSEUR.autres = feuillesUtilisateur(lu.wb);
+        var bilan = integrerFeuillesExcel(lu.wb, false);
+        CLASSEUR.dateFichier = f.lastModified;
+        render();
+        if(bilan.bases.length || bilan.erreurs.length) modal('Modifications Excel intégrées', messageBilan(bilan));
+        else toast('Aucune modification à reprendre dans GAMSERIE, TS ou Matrice.');
+      }catch(e){ modal('Lecture impossible', esc(e.message || e.name)); }
+      res(false);
+    };
+  });
+}
+
+/* Bouton « Reprendre les modifications faites dans Excel » */
+async function reprendreExcel(){
+  var h = CLASSEUR.handle;
+  if(!h){ ouvrirClasseur(); return; }
+  if(!(await autorisation(h, true))){ toast('Accès au classeur refusé.'); return; }
+  var f;
+  try{ f = await h.getFile(); }catch(e){ modal('Lecture impossible', esc(e.message || e.name)); return; }
+  if(!CLASSEUR.modifie){ await chargerDepuisHandle(h, true); return; }
+  await choixConflit(h, f);
 }
 
 /* ---------- enregistrement ---------- */
@@ -234,11 +384,12 @@ async function enregistrerSous(){
     if(e && e.name === 'AbortError') return;
     toast('Choix de l\'emplacement impossible : ' + (e.message || e.name)); return;
   }
-  CLASSEUR.handle = h; CLASSEUR.nom = h.name;
+  CLASSEUR.handle = h; CLASSEUR.nom = h.name; CLASSEUR.dateFichier = 0;
   idbEcrire('classeur', h);
   await ecrireClasseur(h);
 }
 async function ecrireClasseur(h){
+  if(!(await verifierModifExterne(true))) return;
   CLASSEUR.ecritureEnCours = true; majBarreFichier();
   try{
     var data = construireClasseur();
@@ -246,6 +397,7 @@ async function ecrireClasseur(h){
     await w.write(data);
     await w.close();
     CLASSEUR.modifie = false; CLASSEUR.enregistreLe = heureCourante();
+    CLASSEUR.dateFichier = await dateFichier(h);
     toast('Enregistré dans ' + h.name);
   }catch(e){
     modal('Enregistrement impossible',
@@ -273,29 +425,37 @@ function telechargerClasseur(){
 }
 
 /* ---------- ouverture / création ---------- */
-function appliquerDonnees(mem, handle, nom){
+/* lu = résultat de lireClasseur (ou null pour partir des données de démonstration) */
+function appliquerDonnees(lu, handle, nom){
+  var bilan = null;
   CHARGEMENT = true;
   try{
-    MEM = mem;
+    MEM = lu ? lu.mem : {};
     CLASSEUR.handle = handle; CLASSEUR.nom = nom || ''; CLASSEUR.enregistreLe = '';
+    CLASSEUR.autres = lu ? feuillesUtilisateur(lu.wb) : [];
     initialiserApplication();
+    if(lu) bilan = integrerFeuillesExcel(lu.wb, lu.neuf);
   }finally{
     CHARGEMENT = false;
   }
-  CLASSEUR.modifie = false;
+  /* des données reprises d'Excel ne sont pas encore dans l'onglet _Donnees : à enregistrer */
+  CLASSEUR.modifie = !!(bilan && bilan.bases.length);
   fermerAccueil();
+  render();
   majBarreFichier();
+  if(bilan && (bilan.bases.length || bilan.erreurs.length || bilan.ignores.length)) modal('Modifications faites dans Excel', messageBilan(bilan));
+  return bilan;
 }
 function abandonnerModifications(){
   return !CLASSEUR.modifie || confirm('Des modifications ne sont pas enregistrées dans le classeur actuel. Continuer quand même ?');
 }
-async function chargerDepuisHandle(h){
+async function chargerDepuisHandle(h, rechargement){
   try{
     var f = await h.getFile();
-    var mem = lireClasseur(await f.arrayBuffer());
-    appliquerDonnees(mem, h, h.name);
+    var bilan = appliquerDonnees(lireClasseur(await f.arrayBuffer()), h, h.name);
+    CLASSEUR.dateFichier = f.lastModified;
     idbEcrire('classeur', h);
-    toast('Classeur ouvert : ' + h.name);
+    if(!bilan.bases.length) toast(rechargement ? 'Classeur rechargé : modifications faites dans Excel prises en compte.' : 'Classeur ouvert : ' + h.name);
     return true;
   }catch(e){
     modal('Ouverture impossible', 'Le classeur <b>' + esc(h.name) + '</b> n\'a pas pu être lu.'
@@ -319,7 +479,7 @@ async function ouvrirClasseur(){
 }
 async function nouveauClasseur(){
   if(!abandonnerModifications()) return;
-  appliquerDonnees({}, null, '');
+  appliquerDonnees(null, null, '');
   CLASSEUR.modifie = true; majBarreFichier();
   if(FS_OK) await enregistrerSous();
 }
@@ -363,7 +523,7 @@ async function afficherAccueil(){
   document.getElementById('acc-ouvrir').onclick = ouvrirClasseur;
   document.getElementById('acc-nouveau').onclick = nouveauClasseur;
   document.getElementById('acc-demo').onclick = function(){
-    appliquerDonnees({}, null, '');
+    appliquerDonnees(null, null, '');
     toast('Mode découverte : cliquez sur Enregistrer pour créer votre classeur.');
   };
   var first = a.querySelector('.acc-btn'); if(first) first.focus();
@@ -392,7 +552,6 @@ var LOGO = '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><
   var bs = document.getElementById('b-enregistrer');
   bs.innerHTML = ICONES.save + '<span>Enregistrer</span>';
   bs.onclick = function(){ enregistrer(); };
-  document.getElementById('fichier').onclick = function(){ VIEW = 'parametres'; PSET = 'sauvegarde'; render(); };
   document.getElementById('b-theme').onclick = function(){ appliquerTheme(themeCourant() === 'dark' ? 'light' : 'dark'); };
   appliquerTheme(themeCourant());
 
@@ -404,6 +563,8 @@ var LOGO = '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><
       if(e.shiftKey) enregistrerSous(); else enregistrer();
     }
   }, true);
+  window.addEventListener('focus', function(){ verifierModifExterne(false); });
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') verifierModifExterne(false); });
   window.addEventListener('beforeunload', function(e){
     if(CLASSEUR.modifie){ e.preventDefault(); e.returnValue = ''; }
   });

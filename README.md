@@ -45,7 +45,32 @@ Si l'enregistrement échoue, vérifiez que le classeur **n'est pas ouvert dans E
 | Journal | l'historique des révisions |
 | _Donnees *(masqué)* | les données de l'application ; **ne pas modifier** |
 
-Les onglets lisibles sont régénérés à chaque enregistrement : vous pouvez les consulter, les filtrer ou les copier dans Excel, mais les modifications faites directement dans Excel ne sont pas reprises par l'application.
+Un onglet **Mode d'emploi** rappelle ces règles dans le classeur. Vos propres onglets supplémentaires sont conservés à l'enregistrement (sans leur mise en forme).
+
+## Ajouter ou modifier des données dans Excel
+
+Les onglets **GAMSERIE**, **TS** et **Matrice** se modifient directement dans Excel : ajouter des lignes (nouvel article, nouvelle spécification…), corriger une valeur, une tolérance, un fournisseur, etc.
+
+1. Ouvrez le classeur dans Excel, faites vos modifications, **enregistrez et fermez** le classeur.
+2. Revenez dans l'application :
+   - si l'application était déjà ouverte, elle détecte la modification et reprend les données toute seule ;
+   - sinon, ouvrez le classeur depuis l'écran d'accueil.
+3. Un message indique les onglets repris. Enregistrez (**Ctrl + S**) pour mettre le classeur à jour.
+
+Bon à savoir :
+
+- Une gamme (GAMSERIE) ou des valeurs (TS) modifiées dans Excel ouvrent une **révision en brouillon** : validez-la dans *Paramètres → GAMSERIE / TS* pour qu'elle serve aux nouveaux rapports.
+- Dans TS, modifiez **Nominal**, **Tol -**, **Tol +** et **Type spéc.** (Générale / Individuelle). Les colonnes Mini., Maxi., Spécification, Type saisie, Révision, Date et Statut sont recalculées par l'application.
+- Les onglets **Rapports**, **Mesures** et **Journal** sont en lecture seule : les rapports se saisissent dans l'application.
+- Si vous avez aussi des modifications non enregistrées dans l'application, elle vous demande quoi faire : *Intégrer les modifications Excel* (vos rapports en cours sont conservés) ou *Garder la version de l'application*.
+- Un classeur Excel préparé à la main, avec des onglets nommés GAMSERIE, TS et/ou Matrice, peut aussi être ouvert : ses données sont reprises comme bases de départ.
+
+## Navigation
+
+- L'écran principal est la liste des **Rapports enregistrés** : cliquez sur un rapport pour l'ouvrir, ou sur **Nouveau rapport**.
+- Les boutons **Analyses des dérives** et **Paramètres** de cet écran ouvrent les écrans correspondants ; la croix en haut à droite de chaque écran ramène à la liste.
+- Un rapport commencé mais incomplet (article, lot ou quantité échantillon manquant) apparaît dans un bandeau « Rapport en cours » avec un bouton **Reprendre**.
+- L'affichage s'adapte à la taille de l'écran (grand écran, portable, tablette, téléphone).
 
 ## Mode clair / sombre
 

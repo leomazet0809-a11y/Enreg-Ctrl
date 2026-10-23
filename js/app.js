@@ -513,7 +513,23 @@ function photoRev(type, cle, rev){
 function ecartPhoto(type, cle){
   var v = version(type, cle); if(!v) return false;
   var ref = photoRev(type, cle, v.rev);
-  return ref ? JSON.stringify(ref) !== JSON.stringify(photo(type, cle)) : false;
+  return ref ? JSON.stringify(canon(ref)) !== JSON.stringify(canon(photo(type, cle))) : false;
+}
+/* Forme normalisée pour comparer deux photos : clés triées, vides = '',
+   cases vides de fin de tableau ignorées (ex. TYPE SPEC absent). */
+function canon(o){
+  if(o === undefined || o === null) return '';
+  if(Array.isArray(o)){
+    var a = o.map(canon);
+    while(a.length && a[a.length-1] === '') a.pop();
+    return a;
+  }
+  if(typeof o === 'object'){
+    var r = {};
+    Object.keys(o).sort().forEach(function(k){ r[k] = canon(o[k]); });
+    return r;
+  }
+  return o;
 }
 function nouvelleRevision(type, cle){
   var v = version(type, cle);
@@ -758,8 +774,20 @@ function importCSV(base, mode){
   pickFile(function(text, name){
     var rows = parseCSV(text);
     if(rows.length < 2){ toast('Fichier vide ou illisible : ' + name); return; }
-    var head = rows[0].map(function(h){ return String(h).trim(); });
     try{
+      var nrev = importerTableau(base, rows, mode, 'Import ' + name);
+      syncLignes(); saveDraft(); render();
+      toast(nomBase(base) + ' importée (' + (mode === 'remplacer' ? 'remplacement' : 'mise à jour') + ') — ' + name
+        + (nrev ? ' · ' + nrev + ' révision' + (nrev>1?'s':'') + ' à valider' : ''));
+    }catch(e){ toast('Import impossible : ' + e.message); }
+  });
+}
+/* Intègre un tableau (1re ligne = en-têtes) dans une base. Renvoie le nombre
+   de révisions ouvertes en brouillon. Utilisé par l'import CSV et par la
+   reprise des onglets GAMSERIE / TS / Matrice modifiés dans Excel. */
+function importerTableau(base, rows, mode, source){
+    var head = rows[0].map(function(h){ return String(h).trim(); });
+    {
       if(base === 'gamserie'){
         var nrm = head.map(function(x){
           return String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[.\s]/g,'');
@@ -824,6 +852,8 @@ function importCSV(base, mode){
             var r3 = rows[i3];
             var art = t(r3[cArt]), code = t(r3[cCode]).toUpperCase();
             if(!art || !code) continue;
+            /* en remplacement, une ligne sans aucune valeur = point non renseigné */
+            if(mode === 'remplacer' && t(r3[cNom]) === '' && (cTm < 0 || t(r3[cTm]) === '') && (cTp < 0 || t(r3[cTp]) === '') && (!hasTy || t(r3[cTy]) === '')) continue;
             if(!map[art]){ map[art] = {article:art, vals:{}}; ordre.push(art); }
             map[art].vals[code] = hasTy
               ? [conv(t(r3[cNom])), conv(cTm>-1?t(r3[cTm]):''), conv(cTp>-1?t(r3[cTp]):''), t(r3[cTy])]
@@ -851,8 +881,7 @@ function importCSV(base, mode){
           var idx = [];
           head.forEach(function(h,k){ if(/^[A-Z]{1,3}$/.test(h)) idx.push([h,k]); });
           if(!idx.length){
-            toast('En-tête non reconnu : colonnes Article / Code / Nominal attendues, ou colonnes de code (A, B, C…).');
-            return;
+            throw new Error('en-tête non reconnu : colonnes Article / Code / Nominal attendues, ou colonnes de code (A, B, C…).');
           }
           for(var i4=1;i4<rows.length;i4++){
             var r4 = rows[i4];
@@ -871,13 +900,10 @@ function importCSV(base, mode){
       }
       saveDB();
       var nrev = 0;
-      if(base === 'gamserie') nrev = revisionsApresImport('gam', 'Import ' + name);
-      else if(base === 'ts') nrev = revisionsApresImport('ts', 'Import ' + name);
-      syncLignes(); saveDraft(); render();
-      toast(nomBase(base) + ' importée (' + (mode === 'remplacer' ? 'remplacement' : 'mise à jour') + ') — ' + name
-        + (nrev ? ' · ' + nrev + ' révision' + (nrev>1?'s':'') + ' à valider' : ''));
-    }catch(e){ toast('Import impossible : ' + e.message); }
-  });
+      if(base === 'gamserie') nrev = revisionsApresImport('gam', source);
+      else if(base === 'ts') nrev = revisionsApresImport('ts', source);
+      return nrev;
+    }
   function t(v){ return String(v===undefined||v===null?'':v).trim(); }
   function conv(v){ var n = num(v); return isNaN(n) ? v : n; }
 }
@@ -1163,7 +1189,7 @@ function viewRapport(){
 
     /* --- spécifications individuelles : relevé pièce par pièce --- */
     if(hasIndiv){
-      h += '<div class="scroll"><table class="ctl"><thead><tr>'
+      h += '<div class="scroll releve"><table class="ctl"><thead><tr>'
         + '<th class="c-code sticky1">Code</th><th class="c-spec sticky2">Spécification'
         + (fam ? ' <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink3)">— '+esc(fam)+'</span>' : '')
         + '</th><th class="c-tol">Mini.</th><th class="c-tol">Tol -</th><th class="c-tol">Nom.</th><th class="c-tol">Tol +</th><th class="c-tol">Maxi.</th><th class="c-out">Outil</th><th class="c-meth">Méthode</th><th class="c-moy">N° moyen</th>';
@@ -1329,18 +1355,28 @@ function viewHistorique(){
     if(da !== db) return da < db ? 1 : -1;                 // colonne DATE, du plus récent au plus ancien
     return (b.creeLe||'') < (a.creeLe||'') ? -1 : 1;        // à date égale : dernier créé en premier
   });
-  var h = '<div class="sheet"><h2 class="sec">Rapports enregistrés</h2><div class="pad">';
-  h += '<div class="toolbar"><input type="search" id="q" placeholder="Rechercher un article, un lot, un fournisseur…" value="'+esc(window.__q||'')+'" style="min-width:320px">'
+  /* Menu principal : accès aux rapports, aux analyses et aux paramètres */
+  var h = '<div class="sheet"><div class="menuhead"><h2 class="sec">Rapports enregistrés</h2>'
+     + '<div class="menuact">'
+     + '<button class="btn" id="h-analyse">'+ICO_MENU.analyse+'<span>Analyses des dérives</span></button>'
+     + '<button class="btn" id="h-parametres">'+ICO_MENU.reglages+'<span>Paramètres</span></button>'
+     + '<button class="btn pri" id="h-nouveau">'+ICO_MENU.plus+'<span>Nouveau rapport</span></button>'
+     + '</div></div><div class="pad">';
+  if(brouillonEnCours()){
+    h += '<div class="encours"><span><b>Rapport en cours, non enregistré</b> — '
+      + esc([R.article || 'sans article', R.lot ? 'lot ' + R.lot : ''].filter(Boolean).join(' · ')) + '</span>'
+      + '<span class="sp"></span><button class="btn sm" id="h-abandon">Abandonner</button><button class="btn sm pri" id="h-reprendre">Reprendre</button></div>';
+  }
+  h += '<div class="toolbar"><input type="search" id="q" placeholder="Rechercher un article, un lot, un fournisseur…" value="'+esc(window.__q||'')+'">'
      + '<span class="hint" id="q-count">'+list.length+' rapport'+(list.length>1?'s':'')+'</span>'
-     + '<button class="btn sm" id="h-extraction" style="margin-left:auto">Extraction des relevés pour analyses des dérives</button>'
-     + '<button class="btn sm pri" id="h-nouveau">Nouveau rapport</button></div>';
+     + '<span class="hint" style="margin-left:auto">Cliquez sur un rapport pour l\'ouvrir.</span></div>';
   if(!list.length){
-    h += '<div class="empty"><b>Aucun rapport enregistré</b>Les rapports validés depuis l\'onglet Rapport apparaîtront ici.</div>';
+    h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur « Nouveau rapport » pour commencer un contrôle.</div>';
   } else {
     h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Lot / Commande</div><div>Date</div><div>Échant. / rév.</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
     list.forEach(function(r){
       var t = totaux2(r);
-      h += '<div class="r" data-s="'+esc([r.article,r.lot,r.commande,r.fournisseur,r.controleur,r.decision].join(' ').toLowerCase())+'">'
+      h += '<div class="r" data-open="'+r.id+'" tabindex="0" title="Ouvrir ce rapport" data-s="'+esc([r.article,r.lot,r.commande,r.fournisseur,r.controleur,r.decision].join(' ').toLowerCase())+'">'
         + '<div><b>'+esc(r.article)+'</b><br><span class="hint">'+esc(r.fournisseur)+'</span></div>'
         + '<div>'+esc(r.lot)+'<br><span class="hint">'+esc(r.commande)+'</span></div>'
         + '<div>'+frDate(r.date)+'<br><span class="hint">'+esc(r.controleur)+'</span></div>'
@@ -1348,7 +1384,6 @@ function viewHistorique(){
         + '<div><span style="color:var(--ok);font-weight:700">'+t.conforme+' C</span> / <span style="color:var(--nc);font-weight:700">'+t.nonConforme+' NC</span></div>'
         + '<div><span class="tag '+(r.decision==='Accepté'?'a':r.decision==='Refusé'?'r':r.decision==='Attente décision méthodes'?'att':'d')+'">'+esc(libDecision(r.decision))+'</span></div>'
         + '<div class="act2">'
-          + '<button class="btn sm" data-open="'+r.id+'">Ouvrir</button>'
           + '<button class="btn sm" data-dup="'+r.id+'">Dupliquer</button>'
           + '<button class="btn sm" data-exp="'+r.id+'">CSV</button>'
           + '<button class="btn sm dgr" data-del="'+r.id+'">Supprimer</button>'
@@ -2018,9 +2053,13 @@ function psetSauvegarde(){
         : 'Choisissez l\'emplacement du classeur pour pouvoir enregistrer.') + '</div></div></div>'
     + '<p style="max-width:78ch;color:var(--ink2);line-height:1.6">Le projet complet (bases, rapports, révisions, documents) est enregistré dans ce classeur Excel (.xlsx). '
     + 'Cliquez sur <b>Enregistrer</b> en haut de page ou appuyez sur <b>Ctrl + S</b>. '
-    + 'Les onglets lisibles (Rapports, Mesures, GAMSERIE, TS, Matrice, Journal) sont régénérés à chaque enregistrement ; '
     + 'l\'onglet masqué « _Donnees » contient les données de l\'application : ne le modifiez pas.</p>'
+    + '<p style="max-width:78ch;color:var(--ink2);line-height:1.6"><b>Modifier les données dans Excel</b> : les onglets <b>GAMSERIE</b>, <b>TS</b> et <b>Matrice</b> '
+    + 'peuvent être complétés ou corrigés directement dans Excel (ajout de lignes, modification de valeurs). Enregistrez et fermez le classeur dans Excel : '
+    + 'à l\'ouverture du classeur, ou dès que vous revenez dans l\'application, les modifications sont reprises. Une gamme ou des valeurs modifiées ouvrent une '
+    + 'révision en brouillon, à valider ici avant de servir aux nouveaux rapports. Les onglets Rapports, Mesures et Journal sont en lecture seule.</p>'
     + '<div class="toolbar"><button class="btn pri" id="s-saveas">Choisir l\'emplacement du classeur…</button>'
+    + (info.nom ? '<button class="btn" id="s-reload">Reprendre les modifications faites dans Excel</button>' : '')
     + '<button class="btn" id="s-open">Ouvrir un autre classeur…</button>'
     + '<button class="btn" id="s-new">Nouveau classeur…</button></div>'
     + '<h3 class="soustitre">Copie de secours</h3>'
@@ -2381,7 +2420,7 @@ function fermerRapport(){
     modal('Rapport non enregistré',
       'Ce rapport ne peut pas rejoindre les rapports enregistrés tant qu\'il manque :'
       + '<ul>' + manque.map(function(c){ return '<li><b>' + esc(c.nom) + '</b></li>'; }).join('') + '</ul>'
-      + '<p style="margin:12px 0 0">Si vous fermez maintenant, il reste en brouillon et vous le retrouverez tel quel en revenant sur l\'onglet Rapport.</p>',
+      + '<p style="margin:12px 0 0">Si vous fermez maintenant, il reste en brouillon : vous le retrouverez avec le bouton « Reprendre » de l\'écran Rapports enregistrés.</p>',
       function(){ VIEW = 'historique'; render(); }, 'Fermer quand même');
     var ft = document.querySelector('.modal .ft');
     ft.innerHTML = '<button class="btn" data-x3>Compléter</button><button class="btn pri" data-ok3>Fermer quand même</button>';
@@ -2403,11 +2442,26 @@ function bindHistorique(){
   if(q) q.oninput = function(){ window.__q = q.value; filtreRapports(); };
   filtreRapports();
   var bn = document.getElementById('h-nouveau');
-  if(bn) bn.onclick = function(){ R = newReport(); saveDraft(); VIEW = 'rapport'; render(); };
-  var bx = document.getElementById('h-extraction');
-  if(bx) bx.onclick = function(){ VIEW = 'analyse'; render(); };
-  document.querySelectorAll('[data-open]').forEach(function(b){
-    b.onclick = function(){ R = clone(byId(b.dataset.open)); saveDraft(); VIEW='rapport'; render(); };
+  if(bn) bn.onclick = function(){
+    if(brouillonEnCours() && !confirm('Un rapport en cours n\'est pas enregistré (article, lot ou quantité échantillon manquant). L\'abandonner pour en commencer un nouveau ?')) return;
+    R = newReport(); saveDraft(); VIEW = 'rapport'; render();
+  };
+  var b;
+  if(b = document.getElementById('h-analyse')) b.onclick = function(){ VIEW = 'analyse'; render(); };
+  if(b = document.getElementById('h-parametres')) b.onclick = function(){ VIEW = 'parametres'; render(); };
+  if(b = document.getElementById('h-reprendre')) b.onclick = function(){ VIEW = 'rapport'; render(); };
+  if(b = document.getElementById('h-abandon')) b.onclick = function(){
+    if(!confirm('Abandonner le rapport en cours ? Les saisies seront perdues.')) return;
+    R = newReport(); saveDraft(); render();
+  };
+  /* un clic sur la ligne (hors boutons d'action) ouvre le rapport */
+  document.querySelectorAll('.r[data-open]').forEach(function(row){
+    function ouvrir(){
+      if(brouillonEnCours() && R.id !== row.dataset.open && !confirm('Un rapport en cours n\'est pas enregistré. L\'abandonner pour ouvrir ce rapport ?')) return;
+      R = clone(byId(row.dataset.open)); saveDraft(); VIEW = 'rapport'; render();
+    }
+    row.onclick = function(e){ if(!e.target.closest('button')) ouvrir(); };
+    row.onkeydown = function(e){ if((e.key === 'Enter' || e.key === ' ') && e.target === row){ e.preventDefault(); ouvrir(); } };
   });
   document.querySelectorAll('[data-dup]').forEach(function(b){
     b.onclick = function(){
@@ -2440,6 +2494,15 @@ function filtreRapports(){
   var c = document.getElementById('q-count');
   if(c) c.textContent = n + ' rapport' + (n>1?'s':'') + (q ? ' sur ' + rows.length : '');
 }
+/* Rapport en cours de saisie qui n'a pas encore rejoint les rapports enregistrés */
+function brouillonEnCours(){
+  return !!(R && (R.article || R.lot) && !byId(R.id));
+}
+var ICO_MENU = {
+  analyse:'<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 19h16M6 15l4-5 3 3 5-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  reglages:'<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+};
 function byId(id){ for(var i=0;i<REPORTS.length;i++) if(REPORTS[i].id === id) return REPORTS[i]; return null; }
 
 function bindParametres(){
@@ -2570,6 +2633,7 @@ function bindParametres(){
 
   if(b = document.getElementById('s-saveas')) b.onclick = function(){ enregistrerSous(); };
   if(b = document.getElementById('s-open')) b.onclick = function(){ ouvrirClasseur(); };
+  if(b = document.getElementById('s-reload')) b.onclick = function(){ reprendreExcel(); };
   if(b = document.getElementById('s-new')) b.onclick = function(){ nouveauClasseur(); };
   if(b = document.getElementById('s-exp')) b.onclick = exportJSON;
   if(b = document.getElementById('s-imp')) b.onclick = importJSON;
@@ -2595,7 +2659,7 @@ function toast(msg){
    Appelé par js/classeur.js après chargement des données (MEM) depuis le
    classeur Excel, ou avec MEM vide pour partir des données du prototype. */
 function initialiserApplication(){
-  VIEW = 'rapport'; blobCache = {}; fermerDoc();
+  VIEW = 'historique'; blobCache = {}; fermerDoc();
   loadAll();
   initVersions();          // toute famille et tout article non versionné démarre en révision 0
   if(R.article && !R.lignes.length) syncLignes();
