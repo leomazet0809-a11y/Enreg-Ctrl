@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enregistrements Contrôles</title>
+<meta name="description" content="Rapports de contrôle d'entrée enregistrés dans un classeur Excel.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='8' fill='%232563eb'/%3E%3Cpath d='M10 9.5h9M10 14h12M10 18.5h6' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M17.5 22l2.3 2.3 4.7-4.8' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<script>
+  /* Thème appliqué avant l'affichage pour éviter un flash : choix mémorisé, sinon réglage du système */
+  (function(){
+    var t = null;
+    try{ t = localStorage.getItem('ec.theme'); }catch(e){}
+    if(t !== 'light' && t !== 'dark') t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="brand-logo" id="brand-logo"></span>
+    <span class="brand-txt"><b>Enregistrements Contrôles</b><span>Contrôle d'entrée</span></span>
+  </div>
+  <nav class="nav" aria-label="Navigation principale">
+    <button data-view="rapport">Rapport</button>
+    <button data-view="historique">Rapports enregistrés</button>
+    <button data-view="analyse">Analyses</button>
+    <button data-view="parametres">Paramètres</button>
+  </nav>
+  <div class="topright">
+    <button class="fichier" id="fichier" type="button"></button>
+    <button class="btn-save" id="b-enregistrer" type="button" title="Enregistrer dans le classeur (Ctrl+S)" aria-keyshortcuts="Control+S"></button>
+    <button class="icon-btn" id="b-theme" type="button"></button>
+  </div>
+</header>
+<main class="wrap" id="main"></main>
+
+<aside class="viewpane" id="viewpane">
+  <div class="vh"><b id="vp-nom"></b>
+    <button id="vp-ext" title="Ouvrir dans le lecteur PDF du poste">Ouvrir hors de l'appli</button>
+    <button id="vp-close">Fermer</button>
+  </div>
+  <iframe id="vp-frame" title="Document de méthode de contrôle"></iframe>
+  <div class="vf" id="vp-info"></div>
+</aside>
+
+<input type="file" id="filepick" class="file" accept=".csv,.txt,.json">
+<div class="accueil" id="accueil" hidden></div>
+
+<script src="lib/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/classeur.js"></script>
+</body>
+</html>
