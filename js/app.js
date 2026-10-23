@@ -42,13 +42,27 @@ function loadAll(){
   var jl = get('rc.journal'); JOURNAL = jl ? JSON.parse(jl) : [];
   var dc = get('rc.docs'); DOCS = dc ? JSON.parse(dc) : [];
   var r = get('rc.reports'); REPORTS = r ? JSON.parse(r) : [];
-  var dr = get('rc.draft');
+  /* rapport en cours : propre à chaque poste (plusieurs PC partagent le classeur) */
+  var dr = get(cleBrouillon());
+  if(dr === null && get('rc.draft') !== null){ dr = get('rc.draft'); }
+  delete MEM['rc.draft'];
   R = dr ? JSON.parse(dr) : newReport();
 }
 function saveDB(){ put('rc.db', JSON.stringify(DB)); }
 function saveReports(){ put('rc.reports', JSON.stringify(REPORTS)); }
 function saveDocs(){ put('rc.docs', JSON.stringify(DOCS)); return true; }
-function saveDraft(){ R.majLe = new Date().toISOString(); put('rc.draft', JSON.stringify(R)); }
+function saveDraft(){ R.majLe = new Date().toISOString(); put(cleBrouillon(), JSON.stringify(R)); }
+/* Identifiant de ce poste (navigateur), mémorisé localement */
+var POSTE = (function(){
+  var p = null;
+  try{ p = localStorage.getItem('ec.poste'); }catch(e){}
+  if(!p){
+    p = 'P' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    try{ localStorage.setItem('ec.poste', p); }catch(e){}
+  }
+  return p;
+})();
+function cleBrouillon(){ return 'rc.draft.' + POSTE; }
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
 /* =======================================================================
@@ -2058,6 +2072,11 @@ function psetSauvegarde(){
         ? (info.enregistreLe ? 'Dernier enregistrement à ' + info.enregistreLe : 'Pas encore enregistré pendant cette session')
           + (estModifie() ? ' · <b style="color:var(--amber)">modifications non enregistrées</b>' : '')
         : 'Choisissez l\'emplacement du classeur pour pouvoir enregistrer.') + '</div></div></div>'
+    + (info.handle ? '<div class="partage-etat ' + (info.dossier ? 'on' : '') + '"><span><b>Travail à plusieurs</b> — '
+        + (info.dossier
+            ? 'activé : l\'application signale qu\'un autre utilisateur enregistre ou que le classeur est ouvert dans Excel, et enregistre dès qu\'il est disponible.'
+            : 'non activé : autorisez l\'accès au dossier du classeur si plusieurs personnes l\'utilisent.')
+        + '</span>' + (info.dossier ? '' : '<button class="btn sm pri" id="s-dossier">Autoriser l\'accès au dossier…</button>') + '</div>' : '')
     + '<p style="max-width:78ch;color:var(--ink2);line-height:1.6">Le projet complet (bases, rapports, révisions, documents) est enregistré dans ce classeur Excel (.xlsx). '
     + 'Cliquez sur <b>Enregistrer</b> en haut de page ou appuyez sur <b>Ctrl + S</b>. '
     + 'l\'onglet masqué « _Donnees » contient les données de l\'application : ne le modifiez pas.</p>'
@@ -2066,7 +2085,7 @@ function psetSauvegarde(){
     + 'à l\'ouverture du classeur, ou dès que vous revenez dans l\'application, les modifications sont reprises. Une gamme ou des valeurs modifiées ouvrent une '
     + 'révision en brouillon, à valider ici avant de servir aux nouveaux rapports. Les onglets Rapports, Mesures et Journal sont en lecture seule.</p>'
     + '<div class="toolbar"><button class="btn pri" id="s-saveas">Choisir l\'emplacement du classeur…</button>'
-    + (info.nom ? '<button class="btn" id="s-reload">Reprendre les modifications faites dans Excel</button>' : '')
+    + (info.nom ? '<button class="btn" id="s-reload">Relire le classeur (Excel, autres utilisateurs)</button>' : '')
     + '<button class="btn" id="s-open">Ouvrir un autre classeur…</button>'
     + '<button class="btn" id="s-new">Nouveau classeur…</button></div>'
     + '<h3 class="soustitre">Copie de secours</h3>'
@@ -2646,6 +2665,7 @@ function bindParametres(){
   if(b = document.getElementById('s-saveas')) b.onclick = function(){ enregistrerSous(); };
   if(b = document.getElementById('s-open')) b.onclick = function(){ ouvrirClasseur(); };
   if(b = document.getElementById('s-reload')) b.onclick = function(){ reprendreExcel(); };
+  if(b = document.getElementById('s-dossier')) b.onclick = function(){ choisirDossier(); };
   if(b = document.getElementById('s-new')) b.onclick = function(){ nouveauClasseur(); };
   if(b = document.getElementById('s-exp')) b.onclick = exportJSON;
   if(b = document.getElementById('s-imp')) b.onclick = importJSON;

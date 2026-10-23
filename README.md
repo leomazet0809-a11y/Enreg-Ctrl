@@ -65,6 +65,22 @@ Bon à savoir :
 - Si vous avez aussi des modifications non enregistrées dans l'application, elle vous demande quoi faire : *Intégrer les modifications Excel* (vos rapports en cours sont conservés) ou *Garder la version de l'application*.
 - Un classeur Excel préparé à la main, avec des onglets nommés GAMSERIE, TS et/ou Matrice, peut aussi être ouvert : ses données sont reprises comme bases de départ.
 
+## Travailler à plusieurs (plusieurs PC, un seul classeur)
+
+1. Placez le classeur dans un **dossier réseau partagé** accessible depuis chaque PC (lecteur réseau de l'entreprise). Évitez un dossier synchronisé OneDrive / SharePoint : en cas d'enregistrements simultanés, OneDrive crée des copies en conflit.
+2. Sur chaque PC, ouvrez le classeur dans l'application. Au premier usage, elle propose **« Autoriser l'accès au dossier »** : acceptez et choisissez le dossier qui contient le classeur (une seule fois par PC ; option aussi disponible dans *Paramètres → Sauvegarde*).
+3. Chacun enregistre normalement (**Ctrl + S**).
+
+Ce qui se passe à chaque enregistrement :
+
+- Si un autre utilisateur est en train d'enregistrer, le bandeau **« Classeur en cours d'enregistrement par un autre utilisateur »** s'affiche ; votre enregistrement part automatiquement dès que le classeur est disponible.
+- Si le classeur est ouvert dans Excel sur un poste, le bandeau **« Classeur ouvert dans Excel »** s'affiche ; l'enregistrement part dès que le classeur est fermé. Si personne ne l'a réellement ouvert (fichier « ~$… » resté après un arrêt brutal d'Excel), cliquez sur *Enregistrer quand même*.
+- Avant d'écrire, l'application relit le classeur et **fusionne** ce que les autres ont enregistré : rapports ajoutés, modifiés ou supprimés, gammes, valeurs, matrice, révisions, documents. Si un même élément a été modifié sur deux postes, votre version est gardée (pour un rapport, la plus récente).
+- Quand vous revenez dans l'application (changement de fenêtre ou d'onglet), elle relit aussi le classeur et affiche les rapports enregistrés entre-temps par les autres.
+- Le rapport en cours de saisie (non encore complet) reste propre à chaque PC.
+
+Conseil : confiez la modification des gammes et des valeurs (Paramètres, ou onglets Excel) à une seule personne, et laissez les contrôleurs saisir les rapports.
+
 ## Navigation
 
 - L'écran principal est la liste des **Rapports enregistrés** : cliquez sur un rapport pour l'ouvrir, ou sur **Nouveau rapport**.

@@ -13,7 +13,9 @@
 
 var CLASSEUR = {handle:null, nom:'', enregistreLe:'', modifie:false, ecritureEnCours:false,
                 dateFichier:0,   // date de modification du fichier lors du dernier chargement / enregistrement
-                autres:[]};      // onglets ajoutés par l'utilisateur, conservés à l'enregistrement
+                autres:[],       // onglets ajoutés par l'utilisateur, conservés à l'enregistrement
+                dossier:null,    // dossier du classeur (travail à plusieurs : verrou, détection d'Excel)
+                ancetre:null};   // données partagées lors de la dernière synchronisation avec le fichier
 /* Onglets modifiables dans Excel et repris par l'application (ordre d'intégration) */
 var FEUILLES_EDITABLES = [
   {base:'matrice',  feuille:'Matrice',  tableau:function(){ return tableauMatrice(); }},
@@ -22,7 +24,9 @@ var FEUILLES_EDITABLES = [
 ];
 var FEUILLES_APPLI = ['Rapports','Mesures','GAMSERIE','TS','Matrice','Journal','Mode d\'emploi', '_Donnees'];
 var CHARGEMENT = false;   // pendant le chargement, les écritures ne comptent pas comme modifications
-var CLES_DONNEES = ['rc.db','rc.versions','rc.revisions','rc.journal','rc.docs','rc.reports','rc.draft'];
+var CLES_DONNEES = ['rc.db','rc.versions','rc.revisions','rc.journal','rc.docs','rc.reports'];
+/* + une clé « rc.draft.<poste> » par poste : rapport en cours de chacun */
+function cleDonnees(k){ return CLES_DONNEES.indexOf(k) > -1 || /^rc\.draft\.[\w-]+$/.test(k); }
 var FEUILLE_DONNEES = '_Donnees';
 var TAILLE_PART = 30000;  // une cellule Excel accepte au plus 32 767 caractères
 var NOM_DEFAUT = 'Enregistrements-Controles.xlsx';
@@ -46,7 +50,7 @@ function marquerModifie(){
   majBarreFichier();
 }
 function estModifie(){ return CLASSEUR.modifie; }
-function infoClasseur(){ return {nom:CLASSEUR.nom, enregistreLe:CLASSEUR.enregistreLe}; }
+function infoClasseur(){ return {nom:CLASSEUR.nom, enregistreLe:CLASSEUR.enregistreLe, dossier:!!CLASSEUR.dossier, handle:!!CLASSEUR.handle}; }
 function heureCourante(){ var d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
 
 function majBarreFichier(){
@@ -117,7 +121,7 @@ function lireClasseur(buf){
   var parts = {};
   for(var i=1;i<lignes.length;i++){
     var k = String(lignes[i][0] || '').trim();
-    if(CLES_DONNEES.indexOf(k) < 0) continue;
+    if(!cleDonnees(k)) continue;
     (parts[k] = parts[k] || [])[+lignes[i][1] || 0] = String(lignes[i][2] === null || lignes[i][2] === undefined ? '' : lignes[i][2]);
   }
   var mem = {};
@@ -255,7 +259,7 @@ function construireClasseur(){
 
   /* Données de l'application, découpées en parts de 30 000 caractères */
   var aoa = [['Clé','Partie','Contenu (ne pas modifier)']];
-  CLES_DONNEES.forEach(function(k){
+  CLES_DONNEES.concat(Object.keys(MEM).filter(function(k){ return /^rc\.draft\./.test(k); })).forEach(function(k){
     var v = get(k);
     if(v === null) return;
     var i = 0, p = 0;
@@ -290,74 +294,43 @@ function feuilleModeEmploi(){
     [''],
     ['Les colonnes Révision, Date de révision, Statut, Spécification (TS), Type saisie, Mini. et Maxi. sont informatives : elles sont recalculées par l\'application.'],
     ['Une gamme ou des valeurs modifiées dans Excel ouvrent une révision en brouillon, à valider dans l\'application avant de servir aux nouveaux rapports.'],
-    ['Enregistrez et fermez le classeur dans Excel avant d\'enregistrer depuis l\'application. Vos propres onglets supplémentaires sont conservés (sans mise en forme).'],
+    ['Enregistrez et fermez le classeur dans Excel : l\'application attend qu\'il soit fermé pour enregistrer. Vos propres onglets supplémentaires sont conservés (sans mise en forme).'],
+    ['Plusieurs postes peuvent enregistrer dans ce classeur : les rapports et les modifications de chacun sont fusionnés à chaque enregistrement.'],
     ['Ne modifiez pas l\'onglet masqué « _Donnees ».']
   ]);
   ws['!cols'] = [{wch:16},{wch:22},{wch:120}];
   return ws;
 }
 
-/* ---------- modifications faites dans Excel pendant que l'application est ouverte ---------- */
-var verifEnCours = false;
+/* ---------- synchronisation avec le fichier (autres postes, Excel) ---------- */
+var synchroEnCours = false;
 async function dateFichier(h){ try{ return (await h.getFile()).lastModified; }catch(e){ return 0; } }
-/* Renvoie true si l'on peut poursuivre (pas de modification externe, ou choix fait). */
-async function verifierModifExterne(avantEcriture){
+/* Au retour dans l'application (ou sur demande) : reprend ce que les autres
+   postes ou Excel ont enregistré dans le classeur depuis notre dernière lecture. */
+async function synchroniserFichier(manuel){
   var h = CLASSEUR.handle;
-  if(!h || verifEnCours || CLASSEUR.ecritureEnCours) return true;
-  var acc = document.getElementById('accueil'); if(acc && !acc.hidden) return true;
-  if(!(await autorisation(h, false))) return true;
-  verifEnCours = true;
+  if(!h || synchroEnCours || CLASSEUR.ecritureEnCours) return;
+  var acc = document.getElementById('accueil'); if(acc && !acc.hidden) return;
+  if(!(await autorisation(h, !!manuel))) return;
+  synchroEnCours = true; ATTENTE.annule = false;
   try{
+    await attendreFinEcriture(h);
     var f = await h.getFile();
-    if(!CLASSEUR.dateFichier || f.lastModified === CLASSEUR.dateFichier) return true;
-    if(!CLASSEUR.modifie && !avantEcriture){
-      await chargerDepuisHandle(h, true);   // rien à perdre : rechargement complet
-      return false;
-    }
-    return await choixConflit(h, f);
-  }catch(e){ return true; }
-  finally{ verifEnCours = false; }
+    if(!f.size || (!manuel && f.lastModified === CLASSEUR.dateFichier)) return;
+    var r = synchroniserAvec(lireClasseur(await f.arrayBuffer()));
+    CLASSEUR.dateFichier = f.lastModified;
+    if(r.recu) render();
+    if(r.bilan && (r.bilan.bases.length || r.bilan.erreurs.length || r.bilan.ignores.length)) modal('Modifications faites dans Excel', messageBilan(r.bilan));
+    else if(r.recu) toast('Classeur mis à jour avec les enregistrements des autres utilisateurs.');
+    else if(manuel) toast('Le classeur est à jour.');
+  }catch(e){
+    if(!(e && e.annule)) toast('Lecture du classeur impossible : ' + (e && (e.message || e.name)));
+  }finally{
+    synchroEnCours = false; masquerAttente(); majBarreFichier();
+  }
 }
-function choixConflit(h, f){
-  return new Promise(function(res){
-    modal('Classeur modifié dans Excel',
-      'Le classeur <b>' + esc(h.name) + '</b> a été modifié en dehors de l\'application.'
-      + '<ul><li><b>Intégrer les modifications Excel</b> : reprend les onglets GAMSERIE, TS et Matrice du fichier, en gardant vos rapports en cours.</li>'
-      + '<li><b>Garder la version de l\'application</b> : les modifications faites dans Excel seront écrasées au prochain enregistrement.</li></ul>',
-      function(){}, 'Fermer');
-    var ft = document.querySelector('.modal .ft');
-    ft.innerHTML = '<button class="btn" data-garder>Garder la version de l\'application</button><button class="btn pri" data-integrer>Intégrer les modifications Excel</button>';
-    ft.querySelector('[data-garder]').onclick = function(){
-      document.querySelector('.modal').remove();
-      CLASSEUR.dateFichier = f.lastModified;
-      res(true);
-    };
-    ft.querySelector('[data-integrer]').onclick = async function(){
-      document.querySelector('.modal').remove();
-      try{
-        var lu = lireClasseur(await f.arrayBuffer());
-        CLASSEUR.autres = feuillesUtilisateur(lu.wb);
-        var bilan = integrerFeuillesExcel(lu.wb, false);
-        CLASSEUR.dateFichier = f.lastModified;
-        render();
-        if(bilan.bases.length || bilan.erreurs.length) modal('Modifications Excel intégrées', messageBilan(bilan));
-        else toast('Aucune modification à reprendre dans GAMSERIE, TS ou Matrice.');
-      }catch(e){ modal('Lecture impossible', esc(e.message || e.name)); }
-      res(false);
-    };
-  });
-}
-
-/* Bouton « Reprendre les modifications faites dans Excel » */
-async function reprendreExcel(){
-  var h = CLASSEUR.handle;
-  if(!h){ ouvrirClasseur(); return; }
-  if(!(await autorisation(h, true))){ toast('Accès au classeur refusé.'); return; }
-  var f;
-  try{ f = await h.getFile(); }catch(e){ modal('Lecture impossible', esc(e.message || e.name)); return; }
-  if(!CLASSEUR.modifie){ await chargerDepuisHandle(h, true); return; }
-  await choixConflit(h, f);
-}
+/* Bouton « Reprendre les modifications faites dans Excel / par les autres utilisateurs » */
+function reprendreExcel(){ return synchroniserFichier(true); }
 
 /* ---------- enregistrement ---------- */
 /* Termine l'enregistrement différé du rapport en cours avant d'écrire. */
@@ -384,28 +357,62 @@ async function enregistrerSous(){
     if(e && e.name === 'AbortError') return;
     toast('Choix de l\'emplacement impossible : ' + (e.message || e.name)); return;
   }
-  CLASSEUR.handle = h; CLASSEUR.nom = h.name; CLASSEUR.dateFichier = 0;
+  CLASSEUR.handle = h; CLASSEUR.nom = h.name; CLASSEUR.dateFichier = 0; CLASSEUR.dossier = null;
   idbEcrire('classeur', h);
-  await ecrireClasseur(h);
+  await restaurerDossier(h, false);
+  await ecrireClasseur(h, true);
+  proposerDossier();
 }
-async function ecrireClasseur(h){
-  if(!(await verifierModifExterne(true))) return;
+/* sansFusion : nouvel emplacement (Enregistrer sous) — le fichier éventuel est remplacé */
+async function ecrireClasseur(h, sansFusion){
+  if(CLASSEUR.ecritureEnCours) return;
   CLASSEUR.ecritureEnCours = true; majBarreFichier();
+  ATTENTE.annule = false; ATTENTE.forcerExcel = false;
+  var d = null, recu = null;
   try{
+    /* 1. attendre que le classeur soit libre (autre poste en écriture, Excel ouvert), puis le verrouiller */
+    d = await prendreVerrou(h);
+    /* 2. fusionner ce que les autres postes ont enregistré entre-temps */
+    if(!sansFusion){
+      var f = null;
+      try{ f = await h.getFile(); }catch(e){}
+      if(f && f.size && f.lastModified !== CLASSEUR.dateFichier) recu = synchroniserAvec(lireClasseur(await f.arrayBuffer()));
+    }
+    /* 3. écrire ; si le fichier est bloqué (ouvert dans Excel), réessayer dès qu'il se libère */
     var data = construireClasseur();
-    var w = await h.createWritable();
-    await w.write(data);
-    await w.close();
+    for(;;){
+      try{
+        var w = await h.createWritable();
+        await w.write(data);
+        await w.close();
+        break;
+      }catch(e){
+        if(e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e;
+        if(ATTENTE.annule) throw erreurAnnulee();
+        afficherAttente('bloque');
+        if(d) await ecrireVerrou(d, nomVerrou(h));   // garde la main pendant l'attente
+        await pause(2000);
+        if(ATTENTE.annule) throw erreurAnnulee();
+      }
+    }
     CLASSEUR.modifie = false; CLASSEUR.enregistreLe = heureCourante();
     CLASSEUR.dateFichier = await dateFichier(h);
-    toast('Enregistré dans ' + h.name);
+    CLASSEUR.ancetre = instantane(MEM);
+    if(recu && recu.recu){
+      render();
+      toast('Enregistré dans ' + h.name + ' — les enregistrements des autres utilisateurs ont été intégrés'
+        + (recu.conflits ? ' (' + recu.conflits + ' élément' + (recu.conflits>1?'s':'') + ' modifié' + (recu.conflits>1?'s':'') + ' des deux côtés : votre version a été gardée)' : '') + '.');
+    } else toast('Enregistré dans ' + h.name);
+    if(recu && recu.bilan && (recu.bilan.bases.length || recu.bilan.erreurs.length)) modal('Modifications faites dans Excel', messageBilan(recu.bilan));
   }catch(e){
-    modal('Enregistrement impossible',
+    if(e && e.annule) toast('Enregistrement annulé : vos modifications restent à enregistrer.');
+    else modal('Enregistrement impossible',
       'Le classeur <b>' + esc(h.name) + '</b> n\'a pas pu être écrit.'
-      + '<ul><li>S\'il est ouvert dans Excel, fermez-le puis enregistrez à nouveau.</li>'
-      + '<li>Vérifiez que vous avez le droit d\'écrire dans ce dossier, ou choisissez un autre emplacement (Paramètres → Sauvegarde).</li></ul>'
+      + '<ul><li>Vérifiez que vous avez le droit d\'écrire dans ce dossier, ou choisissez un autre emplacement (Paramètres → Sauvegarde).</li></ul>'
       + '<p class="hint" style="margin:10px 0 0">Détail : ' + esc(e && (e.message || e.name) || 'erreur inconnue') + '</p>');
   }finally{
+    if(d) await supprimerVerrou(d, nomVerrou(h));
+    masquerAttente();
     CLASSEUR.ecritureEnCours = false;
     majBarreFichier(); majEtatSauvegarde();
     if(VIEW === 'parametres' && PSET === 'sauvegarde') render();
@@ -435,6 +442,7 @@ function appliquerDonnees(lu, handle, nom){
     CLASSEUR.autres = lu ? feuillesUtilisateur(lu.wb) : [];
     initialiserApplication();
     if(lu) bilan = integrerFeuillesExcel(lu.wb, lu.neuf);
+    CLASSEUR.ancetre = lu ? instantane(MEM) : null;
   }finally{
     CHARGEMENT = false;
   }
@@ -456,6 +464,8 @@ async function chargerDepuisHandle(h, rechargement){
     CLASSEUR.dateFichier = f.lastModified;
     idbEcrire('classeur', h);
     if(!bilan.bases.length) toast(rechargement ? 'Classeur rechargé : modifications faites dans Excel prises en compte.' : 'Classeur ouvert : ' + h.name);
+    if(!CLASSEUR.dossier) await restaurerDossier(h, false);
+    proposerDossier();
     return true;
   }catch(e){
     modal('Ouverture impossible', 'Le classeur <b>' + esc(h.name) + '</b> n\'a pas pu être lu.'
@@ -475,6 +485,7 @@ async function ouvrirClasseur(){
   var hs;
   try{ hs = await window.showOpenFilePicker({types: TYPES_XLSX, id:'enreg-ctrl', multiple:false}); }
   catch(e){ if(!e || e.name !== 'AbortError') toast('Ouverture impossible : ' + (e.message || e.name)); return; }
+  CLASSEUR.dossier = null;
   await chargerDepuisHandle(hs[0]);
 }
 async function nouveauClasseur(){
@@ -517,7 +528,11 @@ async function afficherAccueil(){
   a.hidden = false;
   var b;
   if(b = document.getElementById('acc-reprendre')) b.onclick = async function(){
-    if(await autorisation(dernier, true)) await chargerDepuisHandle(dernier);
+    if(await autorisation(dernier, true)){
+      CLASSEUR.dossier = null;
+      await restaurerDossier(dernier, true);   // le clic autorise aussi l'accès au dossier mémorisé
+      await chargerDepuisHandle(dernier);
+    }
     else toast('Accès refusé au classeur ' + dernier.name + '.');
   };
   document.getElementById('acc-ouvrir').onclick = ouvrirClasseur;
@@ -563,8 +578,8 @@ var LOGO = '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><
       if(e.shiftKey) enregistrerSous(); else enregistrer();
     }
   }, true);
-  window.addEventListener('focus', function(){ verifierModifExterne(false); });
-  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') verifierModifExterne(false); });
+  window.addEventListener('focus', function(){ synchroniserFichier(false); });
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') synchroniserFichier(false); });
   window.addEventListener('beforeunload', function(e){
     if(CLASSEUR.modifie){ e.preventDefault(); e.returnValue = ''; }
   });
