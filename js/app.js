@@ -442,6 +442,14 @@ function mesureStatut(i,j){
   if(isNaN(v)) return '';
   return (v < l.mini - EPS || v > l.maxi + EPS) ? 'out' : 'in';
 }
+/* Nombre de spécifications individuelles hors tolérance (ou NOK) sur une pièce */
+function ncParPiece(j){
+  var c = 0;
+  R.lignes.forEach(function(l,i){ if(specKind(l) === 'individuelle' && mesureStatut(i,j) === 'out') c++; });
+  return c;
+}
+/* Saisie validée : le séparateur décimal est toujours la virgule */
+function virgule(v){ return String(v === null || v === undefined ? '' : v).replace(/\./g, ','); }
 function ncParLigne(i){
   var c = 0, n = nbPieces();
   for(var j=0;j<n;j++) if(mesureStatut(i,j) === 'out') c++;
@@ -1193,7 +1201,7 @@ function viewRapport(){
         + '<th class="c-code sticky1">Code</th><th class="c-spec sticky2">Spécification'
         + (fam ? ' <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink3)">— '+esc(fam)+'</span>' : '')
         + '</th><th class="c-tol">Mini.</th><th class="c-tol">Tol -</th><th class="c-tol">Nom.</th><th class="c-tol">Tol +</th><th class="c-tol">Maxi.</th><th class="c-out">Outil</th><th class="c-meth">Méthode</th><th class="c-moy">N° moyen</th>';
-      for(var j=0;j<n;j++) h += '<th class="c-p">'+(j+1)+'</th>';
+      for(var j=0;j<n;j++){ var ncp = ncParPiece(j); h += '<th class="c-p" data-p="'+j+'">'+(j+1)+(ncp?'<span class="nccount">'+ncp+'</span>':'')+'</th>'; }
       h += '</tr></thead><tbody>';
       R.lignes.forEach(function(l,i){
         if(specKind(l) !== 'individuelle') return;
@@ -1217,7 +1225,7 @@ function viewRapport(){
             var cls = v==='1'||v===1 ? 'v1' : (v==='0'||v===0 ? 'v0' : '');
             h += '<td class="mes '+st+'" data-r="'+i+'" data-c="'+k+'"><button class="q '+cls+'" data-r="'+i+'" data-c="'+k+'"'+dis+'>'+(cls==='v1'?'OK':cls==='v0'?'NOK':'–')+'</button></td>';
           } else {
-            h += '<td class="mes '+st+'" data-r="'+i+'" data-c="'+k+'"><input inputmode="decimal" data-r="'+i+'" data-c="'+k+'" value="'+esc(v)+'"'+dis+'></td>';
+            h += '<td class="mes '+st+'" data-r="'+i+'" data-c="'+k+'"><input inputmode="decimal" data-r="'+i+'" data-c="'+k+'" value="'+esc(virgule(v))+'"'+dis+'></td>';
           }
         }
         h += '</tr>';
@@ -1384,7 +1392,6 @@ function viewHistorique(){
         + '<div><span style="color:var(--ok);font-weight:700">'+t.conforme+' C</span> / <span style="color:var(--nc);font-weight:700">'+t.nonConforme+' NC</span></div>'
         + '<div><span class="tag '+(r.decision==='Accepté'?'a':r.decision==='Refusé'?'r':r.decision==='Attente décision méthodes'?'att':'d')+'">'+esc(libDecision(r.decision))+'</span></div>'
         + '<div class="act2">'
-          + '<button class="btn sm" data-dup="'+r.id+'">Dupliquer</button>'
           + '<button class="btn sm" data-exp="'+r.id+'">CSV</button>'
           + '<button class="btn sm dgr" data-del="'+r.id+'">Supprimer</button>'
         + '</div></div>';
@@ -2261,6 +2268,14 @@ function bindRapport(){
       R.mesures[+inp.dataset.r][+inp.dataset.c] = inp.value;
       enregistrerAuto(); refresh();
     };
+    /* à la validation de la cellule (Entrée, Tab, clic ailleurs) : points -> virgules */
+    inp.onchange = function(){
+      var v = virgule(inp.value);
+      if(v === inp.value) return;
+      inp.value = v;
+      R.mesures[+inp.dataset.r][+inp.dataset.c] = v;
+      enregistrerAuto();
+    };
     inp.onkeydown = navKey;
   });
   document.querySelectorAll('button.q:not(.genq)').forEach(function(b){
@@ -2353,6 +2368,12 @@ function refresh(){
     }
   });
   for(var p=0;p<n;p++){
+    var th = document.querySelector('th.c-p[data-p="'+p+'"]');
+    if(th){
+      var ncp = ncParPiece(p), bp = th.querySelector('.nccount');
+      if(ncp && !bp){ bp = document.createElement('span'); bp.className = 'nccount'; th.appendChild(bp); }
+      if(ncp) bp.textContent = ncp; else if(bp) bp.remove();
+    }
     var td2 = document.querySelector('tfoot td[data-p="'+p+'"]');
     if(!td2) continue;
     var s2 = pieceStatut(p);
@@ -2462,15 +2483,6 @@ function bindHistorique(){
     }
     row.onclick = function(e){ if(!e.target.closest('button')) ouvrir(); };
     row.onkeydown = function(e){ if((e.key === 'Enter' || e.key === ' ') && e.target === row){ e.preventDefault(); ouvrir(); } };
-  });
-  document.querySelectorAll('[data-dup]').forEach(function(b){
-    b.onclick = function(){
-      var r = clone(byId(b.dataset.dup));
-      r.id = uid(); r.statut = 'brouillon'; r.creeLe = new Date().toISOString(); r.date = todayISO(); r.lot = ''; r.decision = '';
-      r.mesures = r.lignes.map(function(){ var a=[]; for(var j=0;j<nbPieces2(r);j++) a.push(''); return a; });
-      R = r; saveDraft(); VIEW='rapport'; render();
-      toast('Copie créée : en-tête conservé, mesures vidées.');
-    };
   });
   document.querySelectorAll('[data-exp]').forEach(function(b){ b.onclick = function(){ exportRapport(byId(b.dataset.exp)); }; });
   document.querySelectorAll('[data-del]').forEach(function(b){

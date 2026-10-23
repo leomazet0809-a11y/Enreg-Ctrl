@@ -216,7 +216,7 @@ table.grid td.act{text-align:center;padding:3px 5px;white-space:nowrap}
 table.grid tr:hover td{background:var(--hover)}
 table.grid td.mono input{font-family:var(--mono);text-align:right}
 .rowlist{border:1px solid var(--rule);border-radius:var(--radius-sm);overflow-x:auto}
-.rowlist > .r{display:grid;grid-template-columns:var(--cols, minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,.7fr) minmax(0,.9fr) minmax(0,.9fr) 270px);
+.rowlist > .r{display:grid;grid-template-columns:var(--cols, minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,.7fr) minmax(0,.9fr) minmax(0,.9fr) 200px);
   gap:0;border-bottom:1px solid var(--rule2);align-items:center;min-width:1020px}
 .rowlist > .r:last-child{border-bottom:0}
 .rowlist > .r:hover{background:var(--hover)}

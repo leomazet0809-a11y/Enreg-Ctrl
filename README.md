@@ -68,6 +68,8 @@ Bon à savoir :
 ## Navigation
 
 - L'écran principal est la liste des **Rapports enregistrés** : cliquez sur un rapport pour l'ouvrir, ou sur **Nouveau rapport**.
+- Dans un rapport, une pastille rouge indique le nombre de pièces non conformes à droite de chaque spécification, et le nombre de spécifications non conformes à côté du numéro de chaque pièce.
+- Les valeurs relevées s'écrivent avec une virgule : un point saisi est remplacé par une virgule dès que la cellule est validée.
 - Les boutons **Analyses des dérives** et **Paramètres** de cet écran ouvrent les écrans correspondants ; la croix en haut à droite de chaque écran ramène à la liste.
 - Un rapport commencé mais incomplet (article, lot ou quantité échantillon manquant) apparaît dans un bandeau « Rapport en cours » avec un bouton **Reprendre**.
 - L'affichage s'adapte à la taille de l'écran (grand écran, portable, tablette, téléphone).
