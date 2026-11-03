@@ -411,16 +411,18 @@ function avantEnregistrement(){
   if(typeof autoT !== 'undefined') clearTimeout(autoT);
   if(VIEW === 'rapport' && R) enregistrerAuto(true);
 }
-async function enregistrer(){
+async function enregistrer(force){
   if(CLASSEUR.ecritureEnCours) return;
+  if(force !== true && alerteRapportIncomplet(function(){ enregistrer(true); })) return;
   avantEnregistrement();
   if(!FS_OK) return telechargerClasseur();
-  if(!CLASSEUR.handle) return enregistrerSous();
-  if(!(await autorisation(CLASSEUR.handle, true))){ toast('Accès au classeur refusé : choisissez son emplacement.'); return enregistrerSous(); }
+  if(!CLASSEUR.handle) return enregistrerSous(true);
+  if(!(await autorisation(CLASSEUR.handle, true))){ toast('Accès au classeur refusé : choisissez son emplacement.'); return enregistrerSous(true); }
   await ecrireClasseur(CLASSEUR.handle);
 }
-async function enregistrerSous(){
+async function enregistrerSous(force){
   if(CLASSEUR.ecritureEnCours) return;
+  if(force !== true && alerteRapportIncomplet(function(){ enregistrerSous(true); })) return;
   avantEnregistrement();
   if(!FS_OK) return telechargerClasseur();
   var h;

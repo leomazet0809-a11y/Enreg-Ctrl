@@ -1557,9 +1557,6 @@ function viewRapport(){
   h += '<span class="hint" id="hint-pieces">'+(t.encours?t.encours+' pièce'+(t.encours>1?'s':'')+' non commencée'+(t.encours>1?'s':''):'Toutes les pièces sont renseignées')+'</span>';
   if(R.decision) h += '<span class="stamp '+stampCls+'">'+esc(libDecision(R.decision))+'</span>';
   h += '<span class="sp"></span>';
-  h += '<button class="btn dgr" id="b-eqf" title="Déclarer un écart qualité fournisseur dans X3">Déclarer un EQf X3</button>';
-  if(R.decision === 'Accepté') h += '<button class="btn" id="b-mvtA" title="Changement de stock X3 : statut Q → A">Mouvement X3 statut A</button>';
-  else if(R.decision === 'Refusé') h += '<button class="btn" id="b-mvtR" title="Changement de stock X3 : statut Q → R">Mouvement X3 statut R</button>';
   h += '<button class="btn" id="b-vider"'+dis+'>Vider les mesures</button>';
   h += '<button class="btn" id="b-csv">Exporter en CSV</button>';
   h += '<button class="btn" id="b-print">Imprimer / PDF</button>';
@@ -2694,14 +2691,6 @@ function bindRapport(){
     if(mdp !== '1'){ toast('Mot de passe incorrect.'); return; }
     R.decision = ''; enregistrerAuto(true); render(); toast('Rapport rouvert (statut : sans décision).');
   };
-  /* Déclaration d'un EQf dans X3 (message + acquittement) */
-  var eqf = document.getElementById('b-eqf');
-  if(eqf) eqf.onclick = function(){ modal('EQf X3', '<p style="margin:0">Génère un EQf dans X3</p>', null, 'Acquitter'); };
-  /* Mouvements de stock X3 selon la décision */
-  var mvA = document.getElementById('b-mvtA');
-  if(mvA) mvA.onclick = function(){ modal('Mouvement X3 — statut A', '<p style="margin:0">Génère un changement de stock X3 du statut Q au statut A</p>', null, 'Acquitter'); };
-  var mvR = document.getElementById('b-mvtR');
-  if(mvR) mvR.onclick = function(){ modal('Mouvement X3 — statut R', '<p style="margin:0">Génère un changement de stock X3 du statut Q au statut R</p>', null, 'Acquitter'); };
   /* Numéros de moyen de contrôle (par point) */
   document.querySelectorAll('input.cmoy, input.genmoy').forEach(function(el){
     el.oninput = function(){ R.moyens = R.moyens || {}; R.moyens[el.dataset.moy] = el.value; enregistrerAuto(); };
@@ -2870,12 +2859,34 @@ function enregistrerAuto(immediat){
 function etatSauvegarde(){
   var m = champsManquants();
   if(m.length) return '<span class="ko">Non enregistré — ' + m.map(function(c){ return esc(c.nom); }).join(', ') + ' à renseigner</span>';
-  if(estModifie()) return '<span class="aen">Rapport complet — à enregistrer dans le classeur (Ctrl+S)</span>';
+  if(estModifie()) return '';
   return '<span class="okk">Enregistré dans le classeur</span>';
 }
 function majEtatSauvegarde(){
   var e = document.getElementById('etat-save');
   if(e) e.innerHTML = etatSauvegarde();
+}
+/* Clic sur Enregistrer (ou Ctrl+S) avec un rapport ouvert incomplet : alerte « Rapport non enregistré ».
+   Renvoie true si l'alerte est affichée ; « Enregistrer quand même » relance suite() (le rapport reste en brouillon). */
+function alerteRapportIncomplet(suite){
+  if(VIEW !== 'rapport' || !R) return false;
+  var manque = champsManquants();
+  if(!manque.length) return false;
+  modal('Rapport non enregistré',
+    'Ce rapport ne peut pas être enregistré tant qu\'il manque :'
+    + '<ul>' + manque.map(function(c){ return '<li><b>' + esc(c.nom) + '</b></li>'; }).join('') + '</ul>'
+    + '<p style="margin:12px 0 0">Complétez ces champs, puis enregistrez de nouveau.</p>',
+    function(){}, 'Compléter');
+  var ft = document.querySelector('.modal .ft');
+  ft.innerHTML = '<button class="btn" data-x4>Enregistrer quand même</button><button class="btn pri" data-ok4>Compléter</button>';
+  ft.querySelector('[data-x4]').onclick = function(){ document.querySelector('.modal').remove(); suite(); };
+  ft.querySelector('[data-ok4]').onclick = function(){
+    document.querySelector('.modal').remove();
+    manque.forEach(function(c){ var el = document.getElementById(c.id); if(el) el.classList.add('miss'); });
+    var first = document.getElementById(manque[0].id);
+    if(first){ first.focus(); if(first.select) first.select(); }
+  };
+  return true;
 }
 /* Fermeture du rapport : retour aux rapports enregistrés */
 function fermerRapport(cible){
