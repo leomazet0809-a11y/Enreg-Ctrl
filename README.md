@@ -63,7 +63,11 @@ Les onglets **GAMSERIE**, **TS** et **Matrice** se modifient directement dans Ex
 Bon à savoir :
 
 - Une gamme (GAMSERIE) ou des valeurs (TS) modifiées dans Excel ouvrent une **révision en brouillon** : validez-la dans *Référentiel → GAMSERIE / TS* pour qu'elle serve aux nouveaux rapports.
-- Dans TS, modifiez **Nominal**, **Tol -**, **Tol +** et **Type spéc.** (Générale / Individuelle). Un point est relié à la gamme uniquement par sa **Famille** et son **Code** (la spécification, le moyen et la méthode sont dans GAMSERIE). Les colonnes Mini., Maxi., Type saisie, Révision, Date et Statut sont recalculées par l'application.
+- **Identifiant des points (colonne ID)** : chaque ligne de GAMSERIE a un identifiant unique de 6 caractères (ex. `X5JVCH`), créé par l'application et qui ne change jamais. C'est lui qui relie la gamme, les valeurs TS, les rapports et les analyses. Le **Code** (A, B, C…) n'est qu'une étiquette : il peut être vide, valoir « N/A », être en double ou changer d'une révision à l'autre.
+  - Ne modifiez pas la colonne ID. Une ligne ajoutée dans GAMSERIE sans ID en reçoit un ; une ligne copiée (ID en double) en reçoit un nouveau.
+  - Dans TS, une ligne est rattachée au point par son **ID**. Une ligne sans ID est rattachée par son code, seulement si ce code est unique dans la gamme de la famille.
+  - Les classeurs créés avant les identifiants sont repris automatiquement à l'ouverture (même résultat sur tous les postes) : enregistrez ensuite le classeur.
+- Dans TS, modifiez **Nominal**, **Tol -**, **Tol +** et **Type spéc.** (Générale / Individuelle). Les colonnes Famille, Code, Mini., Maxi., Type saisie, Révision, Date et Statut sont recalculées par l'application.
 - Les onglets **Rapports**, **Mesures** et **Journal** sont en lecture seule : les rapports se saisissent dans l'application.
 - Si vous avez aussi des modifications non enregistrées dans l'application, elle vous demande quoi faire : *Intégrer les modifications Excel* (vos rapports en cours sont conservés) ou *Garder la version de l'application*.
 - Un classeur Excel préparé à la main, avec des onglets nommés GAMSERIE, TS et/ou Matrice, peut aussi être ouvert : ses données sont reprises comme bases de départ.
