@@ -198,6 +198,16 @@ function messageBilan(bilan){
   if(bilan.erreurs.length) h += '<p style="margin:10px 0 0;color:var(--nc)">Non repris : ' + bilan.erreurs.map(esc).join(' · ') + '</p>';
   return h;
 }
+/* Reprise des onglets modifiés dans Excel : pas de fenêtre, un simple message discret ;
+   une fenêtre seulement si un onglet n'a pas pu être repris (erreur de format). */
+function signalerBilan(bilan, prefixe){
+  if(!bilan) return false;
+  if(bilan.erreurs.length){ modal('Données Excel non reprises', messageBilan(bilan)); return true; }
+  if(!bilan.bases.length) return false;
+  toast((prefixe ? prefixe + ' — données' : 'Données') + ' reprises depuis Excel : ' + bilan.bases.join(', ')
+    + (bilan.revisions ? ' (' + bilan.revisions + ' révision' + (bilan.revisions>1?'s':'') + ' en brouillon à valider)' : '') + '.');
+  return true;
+}
 function feuillesUtilisateur(wb){
   return wb.SheetNames.filter(function(n){ return FEUILLES_APPLI.indexOf(n) < 0; }).map(function(n){ return [n, wb.Sheets[n]]; });
 }
@@ -346,7 +356,7 @@ async function synchroniserFichier(manuel){
     var r = synchroniserAvec(lireClasseur(await f.arrayBuffer()));
     CLASSEUR.dateFichier = f.lastModified;
     if(r.recu) render();
-    if(r.bilan && (r.bilan.bases.length || r.bilan.erreurs.length || r.bilan.ignores.length)) modal('Modifications faites dans Excel', messageBilan(r.bilan));
+    if(signalerBilan(r.bilan)){}
     else if(r.recu) toast('Classeur mis à jour avec les enregistrements des autres utilisateurs.');
     else if(manuel) toast('Le classeur est à jour.');
   }catch(e){
@@ -479,7 +489,7 @@ async function ecrireClasseur(h, sansFusion){
       toast('Enregistré dans ' + h.name + ' — les données du classeur (modifications Excel, autres utilisateurs) ont été intégrées'
         + (recu.conflits ? ' (' + recu.conflits + ' élément' + (recu.conflits>1?'s':'') + ' modifié' + (recu.conflits>1?'s':'') + ' des deux côtés : votre version a été gardée)' : '') + '.');
     } else toast('Enregistré dans ' + h.name);
-    if(recu && recu.bilan && (recu.bilan.bases.length || recu.bilan.erreurs.length)) modal('Modifications faites dans Excel', messageBilan(recu.bilan));
+    if(recu && recu.bilan) signalerBilan(recu.bilan, 'Enregistré dans ' + h.name);
   }catch(e){
     if(e && e.annule) toast('Enregistrement annulé : vos modifications restent à enregistrer.');
     else modal('Enregistrement impossible',
@@ -528,7 +538,7 @@ function appliquerDonnees(lu, handle, nom){
   fermerAccueil();
   render();
   majBarreFichier();
-  if(bilan && (bilan.bases.length || bilan.erreurs.length || bilan.ignores.length)) modal('Modifications faites dans Excel', messageBilan(bilan));
+  signalerBilan(bilan);
   return bilan;
 }
 function abandonnerModifications(){
