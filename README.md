@@ -99,7 +99,7 @@ Conseil : confiez la modification des gammes et des valeurs (Référentiel, ou o
 ## Navigation
 
 - L'écran principal est la liste des **Rapports enregistrés** : cliquez sur un rapport pour l'ouvrir.
-- Le bouton **Nouveau rapport** (document +) est à droite du titre « Rapports enregistrés » : un nouveau rapport s'ouvre uniquement depuis cet écran. Sa **Date** est la date d'ouverture du rapport, renseignée automatiquement (non modifiable).
+- Le bouton **Nouveau rapport** (document +) est à gauche du titre « Rapports enregistrés » : un nouveau rapport s'ouvre uniquement depuis cet écran. Sa **Date** est la date d'ouverture du rapport, renseignée automatiquement (non modifiable).
 - **Référentiel** : GAMSERIE, TS, Matrice, Cohérence, Révisions et Documents. Une pastille orange sur son icône indique le nombre d'incohérences.
 - **Paramètres** : Sauvegarde (classeur, travail à plusieurs, copies) et Affichage (mode clair / sombre, taille du texte).
 - Le ruban en haut regroupe, sur tous les écrans, les icônes **Analyses des dérives** (courbe), **Référentiel** (livre), **Paramètres** (roue crantée), **Enregistrer** (disquette). Depuis un rapport, les mêmes vérifications qu'à sa fermeture s'appliquent.

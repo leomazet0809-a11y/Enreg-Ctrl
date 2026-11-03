@@ -1486,10 +1486,10 @@ function viewHistorique(){
     return (b.creeLe||'') < (a.creeLe||'') ? -1 : 1;        // à date égale : dernier créé en premier
   });
   /* Menu principal : accès aux rapports, aux analyses et aux paramètres */
-  var h = '<div class="sheet"><div class="menuhead"><h2 class="sec">Rapports enregistrés</h2>'
+  var h = '<div class="sheet"><div class="menuhead">'
      + '<button class="btn-nouveau" id="h-nouveau" type="button" title="Nouveau rapport" aria-label="Nouveau rapport">'
      + '<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M12 11v6M9 14h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-     + '</button></div><div class="pad">';
+     + '</button><h2 class="sec">Rapports enregistrés</h2></div><div class="pad">';
   if(brouillonEnCours()){
     h += '<div class="encours"><span><b>Rapport en cours, non enregistré</b> — '
       + esc([R.article || 'sans article', R.lot ? 'lot ' + R.lot : ''].filter(Boolean).join(' · ')) + '</span>'
@@ -1504,7 +1504,7 @@ function viewHistorique(){
      + '<span class="hint" id="q-count">'+list.length+' rapport'+(list.length>1?'s':'')+'</span>'
      + '<span class="hint" style="margin-left:auto">Cliquez sur un rapport pour l\'ouvrir.</span></div>';
   if(!list.length){
-    h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur le bouton « Nouveau rapport » à droite du titre pour commencer un contrôle.</div>';
+    h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur le bouton « Nouveau rapport » à gauche du titre pour commencer un contrôle.</div>';
   } else {
     h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Lot / Commande</div><div>Date</div><div>Échant. / rév.</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
     list.forEach(function(r){

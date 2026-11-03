@@ -566,7 +566,8 @@ table.flat.inc td.act3 .btn + .btn{margin-left:6px}
 .rowlist[data-list="rapports"] .rzh{display:none}
 
 /* --- Bouton Nouveau rapport à droite du titre « Rapports enregistrés » --- */
-.menuhead{justify-content:flex-start}
+.menuhead{justify-content:flex-start;padding-left:18px}
+.menuhead h2.sec{padding-left:0}
 .btn-nouveau{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:0;border-radius:9px;background:var(--accent);color:var(--accent-ink);box-shadow:var(--shadow)}
 .btn-nouveau:hover{background:var(--accent-h)}
 
