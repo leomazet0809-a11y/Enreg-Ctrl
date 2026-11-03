@@ -59,7 +59,7 @@ Les onglets **GAMSERIE**, **TS** et **Matrice** se modifient directement dans Ex
    - à l'ouverture de l'application ou au rafraîchissement de la page : le dernier classeur est rechargé directement si le navigateur a gardé l'autorisation d'y accéder (sinon, cliquez sur **Reprendre « … »** à l'accueil) ;
    - quand vous revenez dans l'application (changement de fenêtre ou d'onglet) ;
    - à chaque enregistrement : le classeur est relu juste avant d'écrire, les modifications Excel sont intégrées puis réécrites avec celles de l'application. Si le classeur était bloqué par Excel, il est relu à nouveau dès qu'il se libère.
-3. Un message indique les onglets repris. Enregistrez (**Ctrl + S**) pour mettre le classeur à jour.
+3. Un court message en bas de l'écran indique les onglets repris (plus de fenêtre à fermer). Enregistrez (**Ctrl + S**) pour mettre le classeur à jour.
 
 Bon à savoir :
 
