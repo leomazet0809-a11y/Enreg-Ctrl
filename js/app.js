@@ -1652,11 +1652,6 @@ function viewHistorique(){
       + esc([R.article || 'sans article', R.lot ? 'lot ' + R.lot : ''].filter(Boolean).join(' · ')) + '</span>'
       + '<span class="sp"></span><button class="btn sm" id="h-abandon">Abandonner</button><button class="btn sm pri" id="h-reprendre">Reprendre</button></div>';
   }
-  var nInc = incoherences().length;
-  if(nInc){
-    h += '<div class="encours incmenu"><span><b>Paramétrage incomplet</b> — ' + nInc + ' incohérence' + (nInc>1?'s':'')
-      + ' entre la Matrice, les gammes et les valeurs TS.</span><span class="sp"></span><button class="btn sm" id="h-incoh">Voir</button></div>';
-  }
   h += '<div class="toolbar"><input type="search" id="q" placeholder="Rechercher un article, un lot, un fournisseur…" value="'+esc(window.__q||'')+'">'
      + '<span class="hint" id="q-count">'+list.length+' rapport'+(list.length>1?'s':'')+'</span>'
      + '<span class="hint" style="margin-left:auto">Cliquez sur un rapport pour l\'ouvrir.</span></div>';

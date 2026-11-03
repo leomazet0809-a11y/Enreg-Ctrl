@@ -83,7 +83,6 @@ Tous les articles d'une famille suivent la même gamme (points de contrôle, moy
   - article sans famille, ou famille absente de GAMSERIE ;
   - point de la gamme sans valeur dans TS (saisissez « - » si le point ne s'applique pas à l'article) ;
   - valeur TS sur un code qui n'existe pas dans la gamme de la famille.
-- Quand il y a des incohérences, un bandeau « Paramétrage incomplet » s'affiche aussi sur l'écran principal.
 
 ## Travailler à plusieurs (plusieurs PC, un seul classeur)
 
