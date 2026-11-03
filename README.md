@@ -17,7 +17,7 @@ Tout le projet est enregistré dans un **classeur Excel (.xlsx)** dont vous choi
 
 ## Enregistrer
 
-- Cliquez sur le bouton **Enregistrer** (icône disquette) en haut de page,
+- Cliquez sur l'icône **disquette** en haut de page,
 - ou appuyez sur **Ctrl + S**.
 
 **Ctrl + Maj + S** enregistre sous un autre nom ou dans un autre dossier.
@@ -63,7 +63,7 @@ Les onglets **GAMSERIE**, **TS** et **Matrice** se modifient directement dans Ex
 Bon à savoir :
 
 - Une gamme (GAMSERIE) ou des valeurs (TS) modifiées dans Excel ouvrent une **révision en brouillon** : validez-la dans *Paramètres → GAMSERIE / TS* pour qu'elle serve aux nouveaux rapports.
-- Dans TS, modifiez **Nominal**, **Tol -**, **Tol +** et **Type spéc.** (Générale / Individuelle). Les colonnes Mini., Maxi., Spécification, Type saisie, Révision, Date et Statut sont recalculées par l'application.
+- Dans TS, modifiez **Nominal**, **Tol -**, **Tol +** et **Type spéc.** (Générale / Individuelle). Un point est relié à la gamme uniquement par sa **Famille** et son **Code** (la spécification, le moyen et la méthode sont dans GAMSERIE). Les colonnes Mini., Maxi., Type saisie, Révision, Date et Statut sont recalculées par l'application.
 - Les onglets **Rapports**, **Mesures** et **Journal** sont en lecture seule : les rapports se saisissent dans l'application.
 - Si vous avez aussi des modifications non enregistrées dans l'application, elle vous demande quoi faire : *Intégrer les modifications Excel* (vos rapports en cours sont conservés) ou *Garder la version de l'application*.
 - Un classeur Excel préparé à la main, avec des onglets nommés GAMSERIE, TS et/ou Matrice, peut aussi être ouvert : ses données sont reprises comme bases de départ.
@@ -98,10 +98,11 @@ Conseil : confiez la modification des gammes et des valeurs (Paramètres, ou ong
 
 ## Navigation
 
-- L'écran principal est la liste des **Rapports enregistrés** : cliquez sur un rapport pour l'ouvrir, ou sur **Nouveau rapport**.
+- L'écran principal est la liste des **Rapports enregistrés** : cliquez sur un rapport pour l'ouvrir.
+- Sur cet écran, le ruban en haut affiche trois icônes : **Nouveau rapport** (document +), **Analyses des dérives** (courbe) et **Paramètres** (roue crantée). Elles ne s'affichent que sur le menu principal : un nouveau rapport s'ouvre uniquement depuis là.
 - Dans un rapport, une pastille rouge indique le nombre de pièces non conformes à droite de chaque spécification, et le nombre de spécifications non conformes à côté du numéro de chaque pièce.
 - Les valeurs relevées s'écrivent avec une virgule : un point saisi est remplacé par une virgule dès que la cellule est validée.
-- Les boutons **Analyses des dérives** et **Paramètres** de cet écran ouvrent les écrans correspondants ; la croix en haut à droite de chaque écran ramène à la liste.
+- La croix en haut à droite des écrans Rapport, Analyses et Paramètres ramène à la liste.
 - Un rapport commencé mais incomplet (article, lot ou quantité échantillon manquant) apparaît dans un bandeau « Rapport en cours » avec un bouton **Reprendre**.
 - L'affichage s'adapte à la taille de l'écran (grand écran, portable, tablette, téléphone).
 

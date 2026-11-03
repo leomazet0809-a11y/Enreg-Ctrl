@@ -58,7 +58,7 @@ input[type="date"]{color-scheme:inherit}
 .brand-txt b{font-size:15px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
 .brand-txt span{font-size:11.5px;color:var(--ink3)}
 .topright{margin-left:auto;display:flex;align-items:center;gap:8px}
-.fichier{display:flex;align-items:center;gap:9px;padding:5px 10px 5px 7px;max-width:320px;min-width:0}
+.fichier{display:flex;align-items:center;gap:9px;padding:5px 10px 5px 7px;max-width:320px;min-width:0;overflow:hidden}
 .fichier .f-ico{display:flex;color:#1f8a4c}
 :root[data-theme="dark"] .fichier .f-ico{color:#4ade80}
 .fichier .f-txt{display:flex;flex-direction:column;min-width:0;line-height:1.2}
@@ -382,7 +382,6 @@ svg.ctlchart .cc-pt-hors{fill:var(--nc)}
 /* ---------- menu principal (Rapports enregistrés) ---------- */
 .menuhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px 12px 0;border-bottom:1px solid var(--rule)}
 .menuhead h2.sec{border-bottom:0;padding-right:0}
-.menuact{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
 .toolbar input[type=search]{flex:0 1 360px;min-width:200px}
 .encours{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;margin-bottom:14px;border:1px solid var(--amberbd);background:var(--amberbg);color:var(--amber);border-radius:var(--radius-sm);font-size:13px}
 .encours b{color:var(--ink)}
@@ -481,8 +480,8 @@ body.rz-active *{cursor:col-resize!important}
 @media (max-width:640px){
   .top{gap:8px;padding:0 10px}
   .brand-txt{display:none}
-  .btn-save span{display:none}
-  .btn-save{padding:0 11px}
+  .menu-top{gap:4px;padding-right:6px}
+  .menu-top .icon-btn,.btn-save{width:34px;height:34px}
   .fichier{max-width:none;flex:1 1 auto;padding-left:0}
   .topright{flex:1 1 auto;min-width:0}
   .hdr{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -492,8 +491,6 @@ body.rz-active *{cursor:col-resize!important}
   .hdr .cell[style*="grid-column"]{border-right:0}
   .menuhead{padding:10px 12px}
   .menuhead h2.sec{padding:0}
-  .menuact{margin-left:0;width:100%}
-  .menuact .btn{flex:1 1 auto;justify-content:center}
   .pad{padding:12px}
   .rbar{padding:10px 10px 10px 14px;flex-wrap:wrap;gap:6px 12px}
   .rbar .close{position:absolute;right:10px}
@@ -549,3 +546,17 @@ table.flat.inc td.act3 .btn + .btn{margin-left:6px}
 .form1 label{display:grid;gap:5px;font-size:13px;color:var(--ink2)}
 .form1 input,.form1 select{width:100%;padding:8px 10px;border:1px solid var(--rule);border-radius:var(--radius-sm);background:var(--field);color:var(--ink);font:inherit;font-size:14px}
 .form1 input:focus,.form1 select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+
+/* --- Ruban : menu principal (icônes seules) et bouton Enregistrer --- */
+.menu-top{display:flex;align-items:center;gap:6px;padding-right:10px;margin-right:2px;border-right:1px solid var(--rule)}
+.menu-top[hidden]{display:none}
+.icon-btn.nouveau{color:var(--accent);border-color:var(--accent)}
+.icon-btn.nouveau:hover{background:var(--accentbg);color:var(--accent-h)}
+.btn-save{width:36px;padding:0;justify-content:center}
+.icon-btn svg,.btn-save svg{flex:none}
+
+/* --- Rapports enregistrés : lignes plus fines, colonnes de largeur fixe --- */
+.rowlist[data-list="rapports"] > .r>div{padding:4px 11px;line-height:1.35}
+.rowlist[data-list="rapports"] > .r.head>div{padding:6px 11px}
+.rowlist[data-list="rapports"] .act2 .btn.sm{height:24px;padding:0 8px;font-size:12px}
+.rowlist[data-list="rapports"] .rzh{display:none}

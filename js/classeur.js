@@ -147,6 +147,12 @@ function empreinte(rows){
     return a;
   }).filter(function(r){ return r.length; }));
 }
+/* Retire la colonne dont l'en-tête (sans accents ni casse) vaut nom */
+function sansColonne(rows, nom){
+  if(!rows.length) return rows;
+  var k = rows[0].map(function(x){ return String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); }).indexOf(nom);
+  return k < 0 ? rows : rows.map(function(r){ r = r.slice(); r.splice(k, 1); return r; });
+}
 /* Compare chaque onglet modifiable du classeur à ce que l'application aurait
    écrit ; un onglet différent a été modifié dans Excel et remplace la base.
    tout = true : reprend tous les onglets présents (classeur préparé à la main). */
@@ -157,6 +163,7 @@ function integrerFeuillesExcel(wb, tout){
   FEUILLES_EDITABLES.forEach(function(f, i){
     var ws = wb.Sheets[f.feuille]; if(!ws) return;
     var rows = lignesFeuille(ws);
+    if(f.base === 'ts') rows = sansColonne(rows, 'specification');   // ancienne colonne informative de TS
     if(!tout && empreinte(rows) === refs[i]) return;
     if(rows.length < 2){ bilan.ignores.push(f.feuille); return; }   // onglet vidé : on ne remplace pas la base par du vide
     try{
@@ -299,7 +306,7 @@ function feuilleModeEmploi(){
     ['Mesures', 'Non', 'Toutes les valeurs relevées.'],
     ['Journal', 'Non', 'Historique des révisions.'],
     [''],
-    ['Les colonnes Révision, Date de révision, Statut, Spécification (TS), Type saisie, Mini. et Maxi. sont informatives : elles sont recalculées par l\'application.'],
+    ['Les colonnes Révision, Date de révision, Statut, Type saisie, Mini. et Maxi. sont informatives : elles sont recalculées par l\'application.'],
     ['Une gamme ou des valeurs modifiées dans Excel ouvrent une révision en brouillon, à valider dans l\'application avant de servir aux nouveaux rapports.'],
     ['Enregistrez et fermez le classeur dans Excel : l\'application attend qu\'il soit fermé pour enregistrer. Vos propres onglets supplémentaires sont conservés (sans mise en forme).'],
     ['Plusieurs postes peuvent enregistrer dans ce classeur : les rapports et les modifications de chacun sont fusionnés à chaque enregistrement.'],
@@ -572,7 +579,7 @@ var LOGO = '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><
 (function(){
   document.getElementById('brand-logo').innerHTML = LOGO;
   var bs = document.getElementById('b-enregistrer');
-  bs.innerHTML = ICONES.save + '<span>Enregistrer</span>';
+  bs.innerHTML = ICONES.save; bs.setAttribute('aria-label', 'Enregistrer (Ctrl+S)');
   bs.onclick = function(){ enregistrer(); };
   document.getElementById('b-theme').onclick = function(){ appliquerTheme(themeCourant() === 'dark' ? 'light' : 'dark'); };
   appliquerTheme(themeCourant());
