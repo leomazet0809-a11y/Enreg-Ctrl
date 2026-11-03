@@ -1634,8 +1634,6 @@ function docPaneRapport(){
 }
 
 /* ---------- vue historique ---------- */
-/* Information secondaire d'une ligne de la liste, sur la même ligne (lignes fines) */
-function sousInfo(x){ x = String(x||'').trim(); return x ? ' <span class="hint">· ' + esc(x) + '</span>' : ''; }
 function viewHistorique(){
   var list = REPORTS.slice().sort(function(a,b){
     var da = String(a.date||''), db = String(b.date||'');
@@ -1658,11 +1656,12 @@ function viewHistorique(){
   if(!list.length){
     h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur le bouton « Nouveau rapport » à gauche du titre pour commencer un contrôle.</div>';
   } else {
-    h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Lot</div><div>Commande</div><div>Date</div><div>Contrôleur</div><div>Échantillon</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
+    h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Fournisseur</div><div>Lot</div><div>Commande</div><div>Date</div><div>Contrôleur</div><div>Échantillon</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
     list.forEach(function(r){
       var t = totaux2(r);
       h += '<div class="r" data-open="'+r.id+'" tabindex="0" title="Ouvrir ce rapport" data-s="'+esc([r.article,r.lot,r.commande,r.fournisseur,r.controleur,r.decision].join(' ').toLowerCase())+'">'
-        + '<div><b>'+esc(r.article)+'</b>'+sousInfo(r.fournisseur)+'</div>'
+        + '<div><b>'+esc(r.article)+'</b></div>'
+        + '<div>'+esc(r.fournisseur)+'</div>'
         + '<div>'+esc(r.lot)+'</div>'
         + '<div>'+esc(r.commande)+'</div>'
         + '<div>'+frDate(r.date)+'</div>'
@@ -3145,9 +3144,9 @@ function bindParametres(){
    Paramètres : petite fenêtre flottante en haut à droite, ouverte par la
    roue crantée du ruban au-dessus de l'écran en cours (sans le quitter).
    ======================================================================= */
-var PARAM_OUVERT = false, PARAM_ONGLET = 'sauvegarde';
+var PARAM_OUVERT = false, PARAM_ONGLET = 'affichage';
 function ouvrirParametres(onglet){
-  if(onglet) PARAM_ONGLET = onglet;
+  PARAM_ONGLET = onglet || 'affichage';   // à l'ouverture : onglet Affichage d'abord
   PARAM_OUVERT = true; rendrePanneauParam();
   var p = document.getElementById('panneau-param'); if(p) p.focus();
 }
@@ -3172,7 +3171,7 @@ function rendrePanneauParam(){
     + '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>'
     + '</button></div>'
     + '<div class="tabs">'
-    + [['sauvegarde','Sauvegarde'],['affichage','Affichage']].map(function(o){
+    + [['affichage','Affichage'],['sauvegarde','Sauvegarde']].map(function(o){
         return '<button data-ponglet="' + o[0] + '" aria-current="' + (PARAM_ONGLET === o[0]) + '">' + o[1] + '</button>';
       }).join('')
     + '</div><div class="pp-corps">' + (PARAM_ONGLET === 'affichage' ? psetAffichage() : psetSauvegarde()) + '</div>';
