@@ -171,7 +171,7 @@ function integrerFeuillesExcel(wb, tout){
   FEUILLES_EDITABLES.forEach(function(f, i){
     var ws = wb.Sheets[f.feuille]; if(!ws) return;
     var rows = lignesFeuille(ws), ref = refs[i];
-    if(f.base === 'ts') rows = sansColonne(rows, 'specification');   // ancienne colonne informative de TS
+    if(f.base === 'ts') rows = sansColonne(sansColonne(rows, 'specification'), 'indice de definition');   // anciennes colonnes informatives de TS
     /* classeur antérieur aux identifiants de points : pas de colonne ID dans l'onglet */
     if(rows.length && sansColonne(rows.slice(0, 1), 'id')[0].length === rows[0].length) ref = sansColonne(ref, 'id');
     if(!tout && empreinte(rows) === empreinte(ref)) return;

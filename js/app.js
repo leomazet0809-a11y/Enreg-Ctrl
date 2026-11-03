@@ -961,10 +961,10 @@ function codesUtilises(){
 /* Export à plat : une ligne par couple article x point de contrôle */
 function exportTS(){ download('TS.csv', toCSV(tableauTS())); }
 function tableauTS(){
-  var rows = [['ID','Révision','Date de révision','Statut','Indice de définition','Article','Famille','Code',
+  var rows = [['ID','Révision','Date de révision','Statut','Article','Famille','Code',
                'Type spéc.','Type saisie','Nominal','Tol -','Tol +','Mini.','Maxi.']];
   lignesTS().forEach(function(l){
-    rows.push([l.id||'', l.rev===null?'':l.rev, l.dateRev?frDate(l.dateRev):'', l.statut, l.indiceDef,
+    rows.push([l.id||'', l.rev===null?'':l.rev, l.dateRev?frDate(l.dateRev):'', l.statut,
       l.article, l.famille, l.code, l.typeSpec||'', l.type,
       l.brut[0], l.brut[1], l.brut[2],
       l.mini===null?'':l.mini, l.maxi===null?'':l.maxi]);
@@ -2025,7 +2025,7 @@ function psetTS(){
     h += '<tr class="'+(debut?'grp':'')+(l.vide?' trou':'')+(l.na?' napp':'')+(l.statut==='archive'?' arch':'')+'">'
       + cellRev('ts', l, debut)
       + td('statut', statutLib(l.statut), tagStatut(l.statut), 'st')
-      + td('article', l.article, (debut ? '<b>'+esc(l.article)+'</b>' + (l.indiceDef ? '<br><span class="hint">'+esc(l.indiceDef)+'</span>' : '') : esc(l.article)), 'art' + (debut?'':' sub'))
+      + td('article', l.article, (debut ? '<b>'+esc(l.article)+'</b>' : esc(l.article)), 'art' + (debut?'':' sub'))
       + td('famille', l.famille, esc(l.famille||'—'), 'fam')
       + td('code', l.code, esc(l.code||'—'), 'cd')
       + td('id', l.id, esc(l.id||'—'), 'idp')
