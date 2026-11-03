@@ -593,3 +593,30 @@ table.flat.inc td.act3 .btn + .btn{margin-left:6px}
 .segment button{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border:0;border-radius:7px;background:transparent;color:var(--ink2);font:inherit;font-weight:500;cursor:pointer}
 .segment button:hover{color:var(--ink)}
 .segment button[aria-checked="true"]{background:var(--paper);color:var(--accent);box-shadow:var(--shadow)}
+
+/* --- Disquette du ruban : blanche quand le classeur est à jour, orange sinon --- */
+.btn-save{background:var(--paper);color:var(--ink2);border:1px solid var(--rule);box-shadow:none}
+.btn-save:hover{background:var(--field);color:var(--ink)}
+.btn-save.a-enregistrer{background:#ea7c0c;border-color:#ea7c0c;color:#fff}
+.btn-save.a-enregistrer:hover{background:#d26e08;border-color:#d26e08;color:#fff}
+:root[data-theme="dark"] .btn-save.a-enregistrer{background:#f59e0b;border-color:#f59e0b;color:#1a1205}
+:root[data-theme="dark"] .btn-save.a-enregistrer:hover{background:#fbb13c;border-color:#fbb13c;color:#1a1205}
+
+/* --- Paramètres : petite fenêtre flottante en haut à droite --- */
+.panneau-param{position:fixed;top:calc(var(--topH) + 8px);right:12px;z-index:90;width:min(460px,calc(100vw / var(--zoom) - 24px));
+  max-height:calc(100dvh / var(--zoom) - var(--topH) - 20px);overflow:auto;background:var(--paper);border:1px solid var(--rule);
+  border-radius:12px;box-shadow:var(--shadow-lg);outline:none;animation:pp-in .14s ease-out}
+.panneau-param[hidden]{display:none}
+@keyframes pp-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.panneau-param .pp-tete{display:flex;align-items:center;justify-content:space-between;padding:10px 10px 10px 16px;border-bottom:1px solid var(--rule)}
+.panneau-param .pp-tete b{font-size:14.5px;font-weight:600}
+.panneau-param .pp-tete .close{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--rule);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink2);cursor:pointer}
+.panneau-param .pp-tete .close svg{width:15px;height:15px}
+.panneau-param .pp-tete .close:hover{background:var(--ncbg);border-color:var(--ncbd);color:var(--nc)}
+.panneau-param .tabs{padding:0 10px}
+.panneau-param .pp-corps{padding:14px 16px 16px}
+.panneau-param .toolbar{flex-wrap:wrap}
+.panneau-param .carte-classeur{margin-top:0}
+.panneau-param .pp-aide{margin:10px 0 12px;line-height:1.5}
+.panneau-param .apercu{max-width:none}
+@media print{.panneau-param{display:none}}

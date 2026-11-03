@@ -31,11 +31,10 @@ var PSET = 'gamserie';     // onglet actif de l'écran Référentiel ou Paramèt
 /* Onglets de chaque écran ; le dernier onglet ouvert de chaque écran est retenu */
 var ONGLETS = {
   referentiel:[['gamserie','GAMSERIE — gammes de contrôle'],['ts','TS — valeurs par article'],['matrice','Matrice — article / fournisseur'],
-               ['coherence','Cohérence'],['revisions','Révisions'],['documents','Documents']],
-  parametres:[['sauvegarde','Sauvegarde'],['affichage','Affichage']]
+               ['coherence','Cohérence'],['revisions','Révisions'],['documents','Documents']]
 };
-var ONGLET_MEMO = {referentiel:'gamserie', parametres:'sauvegarde'};
-function ecranOnglets(){ return VIEW === 'referentiel' || VIEW === 'parametres'; }
+var ONGLET_MEMO = {referentiel:'gamserie'};
+function ecranOnglets(){ return VIEW === 'referentiel'; }
 var TSVUE = '';            // tableau TS : '' | 'trous'
 var FGAM = {}, FTS = {};   // filtres saisis dans les en-têtes de colonnes
 var GARCH = false, TARCH = false;  // affichage des révisions archivées
@@ -1211,7 +1210,7 @@ function totaux2(rep){ var s = R; R = rep; var t = totaux(); R = s; return t; }
 function render(){
   document.querySelectorAll('.nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.view === VIEW ? 'true' : 'false'); });
   majBarreFichier();
-  ['analyse','referentiel','parametres'].forEach(function(v){
+  ['analyse','referentiel'].forEach(function(v){
     var bt = document.getElementById('h-' + v);
     if(bt) bt.setAttribute('aria-current', VIEW === v ? 'true' : 'false');
   });
@@ -1232,6 +1231,7 @@ function render(){
   else if(VIEW === 'analyse') m.innerHTML = viewAnalyse();
   else m.innerHTML = viewParametres();
   bind();
+  rendrePanneauParam();
 }
 
 /* ---------- vue rapport ---------- */
@@ -1661,8 +1661,7 @@ function viewParametres(){
   else if(PSET === 'documents') h += psetDocuments();
   else if(PSET === 'revisions') h += psetRevisions();
   else if(PSET === 'coherence') h += psetCoherence();
-  else if(PSET === 'affichage') h += psetAffichage();
-  else h += psetSauvegarde();
+  else h += psetDocuments();
   h += '</div></div>';
   return h;
 }
@@ -2354,13 +2353,8 @@ function psetSauvegarde(){
             ? 'activé : l\'application signale qu\'un autre utilisateur enregistre ou que le classeur est ouvert dans Excel, et enregistre dès qu\'il est disponible.'
             : 'non activé : autorisez l\'accès au dossier du classeur si plusieurs personnes l\'utilisent.')
         + '</span>' + (info.dossier ? '' : '<button class="btn sm pri" id="s-dossier">Autoriser l\'accès au dossier…</button>') + '</div>' : '')
-    + '<p style="max-width:78ch;color:var(--ink2);line-height:1.6">Le projet complet (bases, rapports, révisions, documents) est enregistré dans ce classeur Excel (.xlsx). '
-    + 'Cliquez sur <b>Enregistrer</b> en haut de page ou appuyez sur <b>Ctrl + S</b>. '
-    + 'l\'onglet masqué « _Donnees » contient les données de l\'application : ne le modifiez pas.</p>'
-    + '<p style="max-width:78ch;color:var(--ink2);line-height:1.6"><b>Modifier les données dans Excel</b> : les onglets <b>GAMSERIE</b>, <b>TS</b> et <b>Matrice</b> '
-    + 'peuvent être complétés ou corrigés directement dans Excel (ajout de lignes, modification de valeurs). Enregistrez et fermez le classeur dans Excel : '
-    + 'à l\'ouverture du classeur, ou dès que vous revenez dans l\'application, les modifications sont reprises. Une gamme ou des valeurs modifiées ouvrent une '
-    + 'révision en brouillon, à valider ici avant de servir aux nouveaux rapports. Les onglets Rapports, Mesures et Journal sont en lecture seule.</p>'
+    + '<p class="hint pp-aide">Tout le projet est enregistré dans ce classeur : <b>Ctrl + S</b> ou la disquette du ruban. '
+    + 'Les onglets GAMSERIE, TS et Matrice peuvent être modifiés dans Excel ; ne modifiez pas l\'onglet masqué « _Donnees ».</p>'
     + '<div class="toolbar"><button class="btn pri" id="s-saveas">Choisir l\'emplacement du classeur…</button>'
     + (info.nom ? '<button class="btn" id="s-reload">Relire le classeur (Excel, autres utilisateurs)</button>' : '')
     + '<button class="btn" id="s-open">Ouvrir un autre classeur…</button>'
@@ -2785,7 +2779,6 @@ function allerVers(v){
 (function(){
   var a = document.getElementById('h-analyse'), p = document.getElementById('h-parametres');
   if(a) a.onclick = function(){ allerVers('analyse'); };
-  if(p) p.onclick = function(){ allerVers('parametres'); };
   var rf = document.getElementById('h-referentiel');
   if(rf) rf.onclick = function(){ allerVers('referentiel'); };
 })();
@@ -2930,11 +2923,6 @@ function bindParametres(){
   if(b = document.getElementById('ts-imp-m')) b.onclick = function(){ importCSV('ts','maj'); };
 
   if(b = document.getElementById('m-add')) b.onclick = creerArticle;
-  if(b = document.getElementById('t-moins')) b.onclick = function(){ changerTaille(-1); };
-  if(b = document.getElementById('t-plus')) b.onclick = function(){ changerTaille(1); };
-  if(b = document.getElementById('t-reset')) b.onclick = function(){ changerTaille(0); };
-  if(b = document.getElementById('th-light')) b.onclick = function(){ appliquerTheme('light'); render(); };
-  if(b = document.getElementById('th-dark')) b.onclick = function(){ appliquerTheme('dark'); render(); };
 
   document.querySelectorAll('[data-incfam]').forEach(function(x){ x.onclick = function(){ choisirFamille(x.dataset.incfam); }; });
   document.querySelectorAll('[data-incts]').forEach(function(x){
@@ -2989,6 +2977,55 @@ function bindParametres(){
   document.querySelectorAll('[data-vdoc]').forEach(function(x){ x.onclick = function(){ ouvrirDoc(x.dataset.vdoc); }; });
   document.querySelectorAll('[data-xdoc]').forEach(function(x){ x.onclick = function(){ supprimerDoc(x.dataset.xdoc); }; });
 
+}
+
+/* =======================================================================
+   Paramètres : petite fenêtre flottante en haut à droite, ouverte par la
+   roue crantée du ruban au-dessus de l'écran en cours (sans le quitter).
+   ======================================================================= */
+var PARAM_OUVERT = false, PARAM_ONGLET = 'sauvegarde';
+function ouvrirParametres(onglet){
+  if(onglet) PARAM_ONGLET = onglet;
+  PARAM_OUVERT = true; rendrePanneauParam();
+  var p = document.getElementById('panneau-param'); if(p) p.focus();
+}
+function fermerParametres(){
+  if(!PARAM_OUVERT) return;
+  PARAM_OUVERT = false; rendrePanneauParam();
+}
+function rendrePanneauParam(){
+  var bt = document.getElementById('h-parametres');
+  if(bt){ bt.setAttribute('aria-current', PARAM_OUVERT ? 'true' : 'false'); bt.setAttribute('aria-expanded', PARAM_OUVERT ? 'true' : 'false'); }
+  var p = document.getElementById('panneau-param');
+  if(!PARAM_OUVERT){ if(p) p.hidden = true; return; }
+  if(!p){
+    p = document.createElement('section');
+    p.id = 'panneau-param'; p.className = 'panneau-param'; p.tabIndex = -1;
+    p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Paramètres');
+    document.body.appendChild(p);
+  }
+  var garde = p.scrollTop;
+  p.innerHTML = '<div class="pp-tete"><b>Paramètres</b>'
+    + '<button class="close" id="pp-fermer" type="button" title="Fermer les paramètres" aria-label="Fermer les paramètres">'
+    + '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>'
+    + '</button></div>'
+    + '<div class="tabs">'
+    + [['sauvegarde','Sauvegarde'],['affichage','Affichage']].map(function(o){
+        return '<button data-ponglet="' + o[0] + '" aria-current="' + (PARAM_ONGLET === o[0]) + '">' + o[1] + '</button>';
+      }).join('')
+    + '</div><div class="pp-corps">' + (PARAM_ONGLET === 'affichage' ? psetAffichage() : psetSauvegarde()) + '</div>';
+  p.hidden = false; p.scrollTop = garde;
+  p.querySelector('#pp-fermer').onclick = fermerParametres;
+  p.querySelectorAll('[data-ponglet]').forEach(function(x){ x.onclick = function(){ PARAM_ONGLET = x.dataset.ponglet; p.scrollTop = 0; rendrePanneauParam(); }; });
+  bindPanneauParam();
+}
+function bindPanneauParam(){
+  var b;
+  if(b = document.getElementById('t-moins')) b.onclick = function(){ changerTaille(-1); };
+  if(b = document.getElementById('t-plus')) b.onclick = function(){ changerTaille(1); };
+  if(b = document.getElementById('t-reset')) b.onclick = function(){ changerTaille(0); };
+  if(b = document.getElementById('th-light')) b.onclick = function(){ appliquerTheme('light'); render(); };
+  if(b = document.getElementById('th-dark')) b.onclick = function(){ appliquerTheme('dark'); render(); };
   if(b = document.getElementById('s-saveas')) b.onclick = function(){ enregistrerSous(); };
   if(b = document.getElementById('s-open')) b.onclick = function(){ ouvrirClasseur(); };
   if(b = document.getElementById('s-reload')) b.onclick = function(){ reprendreExcel(); };
@@ -3004,6 +3041,18 @@ function bindParametres(){
     initVersions(); syncLignes(); saveDraft(); render(); toast('Bases réinitialisées en révision 0.');
   };
 }
+(function(){
+  var bt = document.getElementById('h-parametres');
+  if(bt){ bt.setAttribute('aria-haspopup', 'dialog'); bt.onclick = function(){ if(PARAM_OUVERT) fermerParametres(); else ouvrirParametres(); }; }
+  /* fermeture : Échap, ou clic en dehors de la fenêtre (hors boîtes de dialogue) */
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && PARAM_OUVERT && !document.querySelector('.modal')) fermerParametres(); });
+  document.addEventListener('mousedown', function(e){
+    if(!PARAM_OUVERT) return;
+    var t = e.target;
+    if(t.closest && (t.closest('#panneau-param') || t.closest('#h-parametres') || t.closest('.modal') || t.closest('.attente'))) return;
+    fermerParametres();
+  });
+})();
 
 var toastT = null;
 function toast(msg){

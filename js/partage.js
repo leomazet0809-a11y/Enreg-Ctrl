@@ -188,7 +188,8 @@ async function choisirDossier(){
   await idbEcrire('dossier', d);
   await idbEcrire('seul:' + h.name, false);
   toast('Accès au dossier autorisé : le travail à plusieurs est activé.');
-  if(VIEW === 'parametres' || VIEW === 'referentiel') render();
+  if(VIEW === 'referentiel') render();
+  else if(PARAM_OUVERT) rendrePanneauParam();
   return true;
 }
 /* Proposition unique (par classeur) après ouverture ou création */
