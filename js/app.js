@@ -1506,14 +1506,14 @@ function viewHistorique(){
   if(!list.length){
     h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur le bouton « Nouveau rapport » à gauche du titre pour commencer un contrôle.</div>';
   } else {
-    h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Lot / Commande</div><div>Date</div><div>Échant. / rév.</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
+    h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Lot / Commande</div><div>Date</div><div>Échantillon</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
     list.forEach(function(r){
       var t = totaux2(r);
       h += '<div class="r" data-open="'+r.id+'" tabindex="0" title="Ouvrir ce rapport" data-s="'+esc([r.article,r.lot,r.commande,r.fournisseur,r.controleur,r.decision].join(' ').toLowerCase())+'">'
         + '<div><b>'+esc(r.article)+'</b>'+sousInfo(r.fournisseur)+'</div>'
         + '<div>'+esc(r.lot)+sousInfo(r.commande)+'</div>'
         + '<div>'+frDate(r.date)+sousInfo(r.controleur)+'</div>'
-        + '<div>'+nbPieces2(r)+sousInfo('rév. '+(r.gamRev===null||r.gamRev===undefined?'—':r.gamRev)+' / '+(r.tsRev===null||r.tsRev===undefined?'—':r.tsRev))+'</div>'
+        + '<div>'+nbPieces2(r)+'</div>'
         + '<div><span style="color:var(--ok);font-weight:700">'+t.conforme+' C</span> / <span style="color:var(--nc);font-weight:700">'+t.nonConforme+' NC</span></div>'
         + '<div><span class="tag '+(r.decision==='Accepté'?'a':r.decision==='Refusé'?'r':r.decision==='Attente décision méthodes'?'att':'d')+'">'+esc(libDecision(r.decision))+'</span></div>'
         + '<div class="act2">'
