@@ -105,6 +105,7 @@ Conseil : confiez la modification des gammes et des valeurs (Paramètres, ou ong
 - Les valeurs relevées s'écrivent avec une virgule : un point saisi est remplacé par une virgule dès que la cellule est validée.
 - La croix en haut à droite des écrans Rapport, Analyses et Paramètres ramène à la liste.
 - Un rapport commencé mais incomplet (article, lot ou quantité échantillon manquant) apparaît dans un bandeau « Rapport en cours » avec un bouton **Reprendre**.
+- Chaque bouton affiche une info-bulle qui précise son action après une seconde de survol.
 - L'affichage s'adapte à la taille de l'écran (grand écran, portable, tablette, téléphone).
 
 ## Taille du texte
@@ -121,6 +122,6 @@ L'application peut aussi être publiée avec **GitHub Pages** (Settings → Page
 
 ## Pour information technique
 
-- Application statique : `index.html`, `css/app.css`, `js/app.js` (logique métier), `js/classeur.js` (lecture / écriture du classeur).
+- Application statique : `index.html`, `css/app.css`, `js/app.js` (logique métier), `js/classeur.js` (lecture / écriture du classeur), `js/partage.js` (travail à plusieurs), `js/infobulle.js` (info-bulles).
 - Lecture et écriture Excel : bibliothèque [SheetJS](https://sheetjs.com) incluse dans `lib/` (fonctionne sans connexion internet).
 - Accès au fichier : API *File System Access* de Chrome / Edge. Dans un autre navigateur, chaque enregistrement télécharge une copie du classeur.
