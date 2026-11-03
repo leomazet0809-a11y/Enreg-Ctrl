@@ -355,6 +355,43 @@ async function synchroniserFichier(manuel){
     synchroEnCours = false; masquerAttente(); majBarreFichier();
   }
 }
+/* Référentiel → Actualiser : recharge toutes les données du classeur Excel dans l'application,
+   sans rien écrire dans le classeur. Des modifications non enregistrées dans l'application :
+   on demande s'il faut les garder (fusion) ou les remplacer par le contenu du classeur. */
+async function actualiserDepuisExcel(){
+  var h = CLASSEUR.handle;
+  if(!h){ toast('Aucun classeur ouvert : choisissez son emplacement dans Paramètres → Sauvegarde.'); return; }
+  if(CLASSEUR.ecritureEnCours || synchroEnCours){ toast('Enregistrement en cours : réessayez dans un instant.'); return; }
+  if(!(await autorisation(h, true))){ toast('Accès refusé au classeur ' + h.name + '.'); return; }
+  if(!CLASSEUR.modifie) return rechargerDepuisExcel(h);
+  modal('Actualiser depuis Excel',
+    '<p style="margin:0">Des modifications faites dans l\'application <b>ne sont pas encore enregistrées</b> dans le classeur.</p>'
+    + '<p style="margin:10px 0 0">Les garder (les données du classeur sont ajoutées autour), ou les abandonner et recharger exactement le contenu du classeur Excel ?</p>',
+    function(){}, 'Annuler');
+  var ft = document.querySelector('.modal .ft');
+  ft.innerHTML = '<button class="btn" data-x2>Annuler</button><button class="btn" data-garder>Garder mes modifications</button>'
+    + '<button class="btn pri" data-remplacer>Recharger le classeur Excel</button>';
+  function fermer(){ var m = document.querySelector('.modal'); if(m) m.remove(); }
+  ft.querySelector('[data-x2]').onclick = fermer;
+  ft.querySelector('[data-garder]').onclick = function(){ fermer(); synchroniserFichier(true); };
+  ft.querySelector('[data-remplacer]').onclick = function(){ fermer(); rechargerDepuisExcel(h); };
+}
+async function rechargerDepuisExcel(h){
+  var vue = VIEW, onglet = PSET, heure = CLASSEUR.enregistreLe;
+  synchroEnCours = true; ATTENTE.annule = false;
+  try{
+    await attendreFinEcriture(h);
+    var f = await h.getFile();
+    var bilan = appliquerDonnees(lireClasseur(await f.arrayBuffer()), h, h.name);
+    CLASSEUR.dateFichier = f.lastModified; CLASSEUR.enregistreLe = heure;
+    VIEW = vue; PSET = onglet; render(); majBarreFichier();
+    if(!(bilan && (bilan.bases.length || bilan.erreurs.length || bilan.ignores.length))) toast('Données rechargées depuis ' + h.name + '.');
+  }catch(e){
+    if(!(e && e.annule)) toast('Lecture du classeur impossible : ' + (e && (e.message || e.name)));
+  }finally{
+    synchroEnCours = false; masquerAttente();
+  }
+}
 /* Bouton « Reprendre les modifications faites dans Excel / par les autres utilisateurs » */
 function reprendreExcel(){ return synchroniserFichier(true); }
 

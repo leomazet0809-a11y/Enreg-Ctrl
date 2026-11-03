@@ -17,6 +17,7 @@
     'pp-fermer':   'Fermer les paramètres',
     'p-fermer':    'Fermer et revenir aux rapports enregistrés',
     'a-fermer':    'Fermer les analyses et revenir aux rapports enregistrés',
+    'r-actualiser':'Recharger toutes les données du classeur Excel dans l\'application, sans rien enregistrer dans le classeur',
     'h-nouveau':   'Commencer un nouveau rapport de contrôle',
     'h-analyse':   'Analyses des dérives : cartes de contrôle et tendances des mesures',
     'h-referentiel':'Référentiel : gammes, valeurs TS, matrice, cohérence, révisions et documents',
