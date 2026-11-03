@@ -43,7 +43,7 @@ Si l'enregistrement échoue, vérifiez que le classeur **n'est pas ouvert dans E
 | Rapports | une ligne par rapport enregistré (article, lot, quantités, conformes / non conformes, décision…) |
 | Mesures | toutes les valeurs relevées, pièce par pièce, avec leur résultat |
 | GAMSERIE | les gammes de contrôle par famille |
-| TS | les valeurs attendues par article (nominal, tolérances, mini, maxi) |
+| TS | les valeurs attendues par article (nominal, tolérances, type de spécification) |
 | Matrice | la matrice article / fournisseur et les références documentaires |
 | Journal | l'historique des révisions |
 | _Donnees *(masqué)* | les données de l'application ; **ne pas modifier** |
@@ -67,7 +67,7 @@ Bon à savoir :
   - Ne modifiez pas la colonne ID. Une ligne ajoutée dans GAMSERIE sans ID en reçoit un ; une ligne copiée (ID en double) en reçoit un nouveau.
   - Dans TS, une ligne est rattachée au point par son **ID**. Une ligne sans ID est rattachée par son code, seulement si ce code est unique dans la gamme de la famille.
   - Les classeurs créés avant les identifiants sont repris automatiquement à l'ouverture (même résultat sur tous les postes) : enregistrez ensuite le classeur.
-- Dans TS, modifiez **Nominal**, **Tol -**, **Tol +** et **Type spéc.** (Générale / Individuelle). Les colonnes Famille, Code, Mini., Maxi., Type saisie, Révision, Date et Statut sont recalculées par l'application.
+- Dans TS, modifiez **Nominal**, **Tol -**, **Tol +** et **Type spéc.** (Générale / Individuelle). Les colonnes Famille, Code, Type saisie, Révision, Date et Statut sont recalculées par l'application. Mini. et Maxi. (nominal + tolérances) ne figurent plus dans TS : ils sont calculés et affichés dans les rapports, les analyses des dérives et les cartes de contrôle.
 - Les onglets **Rapports**, **Mesures** et **Journal** sont en lecture seule : les rapports se saisissent dans l'application.
 - Si vous avez aussi des modifications non enregistrées dans l'application, elle vous demande quoi faire : *Intégrer les modifications Excel* (vos rapports en cours sont conservés) ou *Garder la version de l'application*.
 - Un classeur Excel préparé à la main, avec des onglets nommés GAMSERIE, TS et/ou Matrice, peut aussi être ouvert : ses données sont reprises comme bases de départ.

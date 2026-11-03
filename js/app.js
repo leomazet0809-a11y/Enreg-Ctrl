@@ -962,12 +962,11 @@ function codesUtilises(){
 function exportTS(){ download('TS.csv', toCSV(tableauTS())); }
 function tableauTS(){
   var rows = [['ID','Révision','Date de révision','Statut','Article','Famille','Code',
-               'Type spéc.','Type saisie','Nominal','Tol -','Tol +','Mini.','Maxi.']];
+               'Type spéc.','Type saisie','Nominal','Tol -','Tol +']];
   lignesTS().forEach(function(l){
     rows.push([l.id||'', l.rev===null?'':l.rev, l.dateRev?frDate(l.dateRev):'', l.statut,
       l.article, l.famille, l.code, l.typeSpec||'', l.type,
-      l.brut[0], l.brut[1], l.brut[2],
-      l.mini===null?'':l.mini, l.maxi===null?'':l.maxi]);
+      l.brut[0], l.brut[1], l.brut[2]]);
   });
   return rows;
 }
@@ -2016,7 +2015,7 @@ function psetTS(){
     + thf('ts','article','Article','w-art') + thf('ts','famille','Famille','w-fam') + thf('ts','code','Code','w-code') + thf('ts','id','ID','w-id')
     + thf('ts','typespec','Type spéc.','w-type') + thf('ts','typesaisie','Type saisie','w-type')
     + thf('ts','nom','Nominal','w-val') + thf('ts','tolm','Tol -','w-val')
-    + thf('ts','tolp','Tol +','w-val') + thf('ts','mini','Mini.','w-val') + thf('ts','maxi','Maxi.','w-val')
+    + thf('ts','tolp','Tol +','w-val')
     + '</tr></thead><tbody>';
   var prec = '';
   lignes.forEach(function(l){
@@ -2032,8 +2031,6 @@ function psetTS(){
       + tdTypeSpec(l)
       + td('typesaisie', l.type, l.type, 'ty')
       + tdVal(l, 0, 'nom') + tdVal(l, 1, 'tolm') + tdVal(l, 2, 'tolp')
-      + td('mini', l.mini===null?'':fmt(l.mini), l.mini===null?'—':fmt(l.mini), 'bn')
-      + td('maxi', l.maxi===null?'':fmt(l.maxi), l.maxi===null?'—':fmt(l.maxi), 'bn')
       + '</tr>';
   });
   h += '</tbody></table></div>';
