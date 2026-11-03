@@ -396,13 +396,25 @@ async function ecrireClasseur(h, sansFusion){
   try{
     /* 1. attendre que le classeur soit libre (autre poste en écriture, Excel ouvert), puis le verrouiller */
     d = await prendreVerrou(h);
-    /* 2. fusionner ce que les autres postes ont enregistré entre-temps */
-    if(!sansFusion){
+    /* 2. relire le classeur juste avant d'écrire : ce qui a été modifié dans Excel (GAMSERIE, TS, Matrice)
+          et ce que les autres postes ont enregistré est intégré à l'application, puis réécrit avec elle */
+    async function relire(){
+      if(sansFusion) return;
       var f = null;
       try{ f = await h.getFile(); }catch(e){}
-      if(f && f.size && f.lastModified !== CLASSEUR.dateFichier) recu = synchroniserAvec(lireClasseur(await f.arrayBuffer()));
+      if(!f || !f.size) return;
+      var r = synchroniserAvec(lireClasseur(await f.arrayBuffer()));
+      if(!recu) recu = r;
+      else {
+        recu.recu = recu.recu || r.recu; recu.conflits += r.conflits;
+        if(r.bilan){ recu.bilan = recu.bilan || {bases:[], revisions:0, ignores:[], erreurs:[]};
+          r.bilan.bases.forEach(function(b){ if(recu.bilan.bases.indexOf(b) < 0) recu.bilan.bases.push(b); });
+          recu.bilan.revisions += r.bilan.revisions; recu.bilan.erreurs = recu.bilan.erreurs.concat(r.bilan.erreurs); }
+      }
     }
-    /* 3. écrire ; si le fichier est bloqué (ouvert dans Excel), réessayer dès qu'il se libère */
+    await relire();
+    /* 3. écrire ; si le fichier est bloqué (ouvert dans Excel), réessayer dès qu'il se libère,
+          après avoir relu ce qui a pu y être enregistré entre-temps */
     var data = construireClasseur();
     for(;;){
       try{
@@ -417,6 +429,7 @@ async function ecrireClasseur(h, sansFusion){
         if(d) await ecrireVerrou(d, nomVerrou(h));   // garde la main pendant l'attente
         await pause(2000);
         if(ATTENTE.annule) throw erreurAnnulee();
+        try{ await relire(); data = construireClasseur(); }catch(e2){}
       }
     }
     CLASSEUR.modifie = false; CLASSEUR.enregistreLe = heureCourante();
@@ -424,7 +437,7 @@ async function ecrireClasseur(h, sansFusion){
     CLASSEUR.ancetre = instantane(MEM);
     if(recu && recu.recu){
       render();
-      toast('Enregistré dans ' + h.name + ' — les enregistrements des autres utilisateurs ont été intégrés'
+      toast('Enregistré dans ' + h.name + ' — les données du classeur (modifications Excel, autres utilisateurs) ont été intégrées'
         + (recu.conflits ? ' (' + recu.conflits + ' élément' + (recu.conflits>1?'s':'') + ' modifié' + (recu.conflits>1?'s':'') + ' des deux côtés : votre version a été gardée)' : '') + '.');
     } else toast('Enregistré dans ' + h.name);
     if(recu && recu.bilan && (recu.bilan.bases.length || recu.bilan.erreurs.length)) modal('Modifications faites dans Excel', messageBilan(recu.bilan));
@@ -533,9 +546,14 @@ function pickFileBinaire(cb){
 
 /* ---------- écran d'accueil ---------- */
 function fermerAccueil(){ var a = document.getElementById('accueil'); if(a) a.hidden = true; }
-async function afficherAccueil(){
+async function afficherAccueil(auDemarrage){
   var a = document.getElementById('accueil');
   var dernier = FS_OK ? await idbLire('classeur') : null;
+  /* ouverture ou rafraîchissement de la page : si le navigateur a gardé l'autorisation
+     sur le dernier classeur, ses données sont rechargées directement depuis Excel */
+  if(auDemarrage && dernier && await autorisation(dernier, false)){
+    if(await chargerDepuisHandle(dernier, true)) return;
+  }
   var h = '<div class="accueil-box" role="dialog" aria-modal="true" aria-labelledby="acc-titre">'
     + '<div class="acc-logo">' + LOGO + '</div>'
     + '<h1 id="acc-titre">Enregistrements Contrôles</h1>'
@@ -612,5 +630,5 @@ var LOGO = '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><
   });
 
   majBarreFichier();
-  afficherAccueil();
+  afficherAccueil(true);
 })();
