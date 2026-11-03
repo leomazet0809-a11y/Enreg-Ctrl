@@ -179,7 +179,7 @@ function messageBilan(bilan){
   if(bilan.bases.length){
     h += '<p style="margin:0">Données reprises depuis Excel : <b>' + bilan.bases.map(esc).join(', ') + '</b>.</p>';
     if(bilan.revisions) h += '<p style="margin:10px 0 0"><b>' + bilan.revisions + ' révision' + (bilan.revisions>1?'s':'') + ' en brouillon</b> : '
-      + 'les gammes ou valeurs modifiées ne s\'appliquent aux nouveaux rapports qu\'après validation dans <b>Paramètres → GAMSERIE / TS</b> (bouton « Valider les brouillons »).</p>';
+      + 'les gammes ou valeurs modifiées ne s\'appliquent aux nouveaux rapports qu\'après validation dans <b>Référentiel → GAMSERIE / TS</b> (bouton « Valider les brouillons »).</p>';
     h += '<p style="margin:10px 0 0">Enregistrez (<b>Ctrl + S</b>) pour mettre le classeur à jour.</p>';
   }
   if(bilan.ignores.length) h += '<p style="margin:10px 0 0">Onglet vide ignoré : ' + bilan.ignores.map(esc).join(', ') + '.</p>';
@@ -581,7 +581,6 @@ var LOGO = '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><
   var bs = document.getElementById('b-enregistrer');
   bs.innerHTML = ICONES.save; bs.setAttribute('aria-label', 'Enregistrer (Ctrl+S)');
   bs.onclick = function(){ enregistrer(); };
-  document.getElementById('b-theme').onclick = function(){ appliquerTheme(themeCourant() === 'dark' ? 'light' : 'dark'); };
   appliquerTheme(themeCourant());
 
   window.addEventListener('keydown', function(e){
