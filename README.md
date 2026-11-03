@@ -107,10 +107,11 @@ Conseil : confiez la modification des gammes et des valeurs (Référentiel, ou o
 - Le bouton **Nouveau rapport** (document +) est à gauche du titre « Rapports enregistrés » : un nouveau rapport s'ouvre uniquement depuis cet écran. Sa **Date** est la date d'ouverture du rapport, renseignée automatiquement (non modifiable).
 - **Référentiel** : GAMSERIE, TS, Matrice, Cohérence, Révisions et Documents. Une pastille orange sur son icône indique le nombre d'incohérences.
 - **Paramètres** (roue crantée) : s'ouvre dans une petite fenêtre en haut à droite, par-dessus l'écran en cours, sans le quitter. Onglets Sauvegarde (classeur, travail à plusieurs, copies) et Affichage (mode clair / sombre, taille du texte). La croix, la touche Échap ou un clic en dehors la referment.
-- Le ruban en haut regroupe, sur tous les écrans, les icônes **Analyses des dérives** (courbe), **Référentiel** (livre), **Paramètres** (roue crantée), **Enregistrer** (disquette). Depuis un rapport, les mêmes vérifications qu'à sa fermeture s'appliquent.
+- Le ruban en haut regroupe les icônes **Analyses des dérives** (courbe), **Référentiel** (livre), **Paramètres** (roue crantée), **Enregistrer** (disquette). Depuis un rapport, les mêmes vérifications qu'à sa fermeture s'appliquent.
 - Dans un rapport, une pastille rouge indique le nombre de pièces non conformes à droite de chaque spécification, et le nombre de spécifications non conformes à côté du numéro de chaque pièce.
 - Les valeurs relevées s'écrivent avec une virgule : un point saisi est remplacé par une virgule dès que la cellule est validée.
-- La croix en haut à droite des écrans Rapport, Analyses et Référentiel ramène à la liste.
+- **Analyses des dérives** et **Référentiel** s'ouvrent dans une grande fenêtre flottante au-dessus du menu principal. Tant qu'elle est ouverte, seuls **Enregistrer** et **Paramètres** restent accessibles dans le ruban. La croix, la touche Échap ou un clic sur le fond grisé la referment et ramènent au menu principal.
+- La croix en haut à droite d'un rapport ramène à la liste.
 - Un rapport commencé mais incomplet (article, lot ou quantité échantillon manquant) apparaît dans un bandeau « Rapport en cours » avec un bouton **Reprendre**.
 - Chaque bouton affiche une info-bulle qui précise son action après une seconde de survol.
 - L'affichage s'adapte à la taille de l'écran (grand écran, portable, tablette, téléphone).

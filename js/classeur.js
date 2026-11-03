@@ -174,6 +174,8 @@ function integrerFeuillesExcel(wb, tout){
     if(f.base === 'ts') ['specification', 'indice de definition', 'mini.', 'maxi.'].forEach(function(c){ rows = sansColonne(rows, c); });   // anciennes colonnes informatives de TS
     /* classeur antérieur aux identifiants de points : pas de colonne ID dans l'onglet */
     if(rows.length && sansColonne(rows.slice(0, 1), 'id')[0].length === rows[0].length) ref = sansColonne(ref, 'id');
+    /* colonne Type saisie : informative, recalculée (son libellé a pu changer d'une version à l'autre) */
+    if(f.base === 'ts'){ rows = sansColonne(rows, 'type saisie'); ref = sansColonne(ref, 'type saisie'); }
     if(!tout && empreinte(rows) === empreinte(ref)) return;
     if(rows.length < 2){ bilan.ignores.push(f.feuille); return; }   // onglet vidé : on ne remplace pas la base par du vide
     try{
