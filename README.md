@@ -29,7 +29,10 @@ En haut à droite, l'indicateur du classeur affiche son nom et son état :
 | verte — *Enregistré à 14:32* | tout est écrit dans le classeur |
 | orange — *Modifications non enregistrées* | pensez à enregistrer |
 
-Si vous fermez l'onglet avec des modifications non enregistrées, le navigateur vous prévient.
+Tant que le contenu de l'application n'est pas enregistré dans le classeur :
+
+- en quittant un rapport (croix en haut à droite), l'application demande si vous êtes certain de vouloir fermer : *Annuler*, *Fermer sans enregistrer* ou *Enregistrer et fermer* ;
+- en fermant l'onglet ou la page du navigateur, le navigateur demande confirmation avant de quitter.
 
 Si l'enregistrement échoue, vérifiez que le classeur **n'est pas ouvert dans Excel** au même moment, puis recommencez.
 
@@ -64,6 +67,18 @@ Bon à savoir :
 - Les onglets **Rapports**, **Mesures** et **Journal** sont en lecture seule : les rapports se saisissent dans l'application.
 - Si vous avez aussi des modifications non enregistrées dans l'application, elle vous demande quoi faire : *Intégrer les modifications Excel* (vos rapports en cours sont conservés) ou *Garder la version de l'application*.
 - Un classeur Excel préparé à la main, avec des onglets nommés GAMSERIE, TS et/ou Matrice, peut aussi être ouvert : ses données sont reprises comme bases de départ.
+
+## Créer un article et vérifier la cohérence
+
+Tous les articles d'une famille suivent la même gamme (points de contrôle, moyens et méthodes) ; seules les valeurs changent d'un article à l'autre, dans TS.
+
+- **Créer un article** (*Paramètres → TS* ou *Matrice → Ajouter un article*) : indiquez sa référence, son fournisseur et sa famille. Ses lignes TS sont préparées automatiquement à partir de la gamme de la famille, avec le type de spécification habituel de la famille : il ne reste qu'à saisir les valeurs. Vous pouvez aussi partir des valeurs d'un article existant de la même famille.
+- Changer la famille d'un article dans la Matrice (article en révision brouillon) prépare de la même façon les points manquants.
+- **Paramètres → Cohérence** liste ce qui empêche un article d'avoir un rapport complet, avec un bouton pour corriger :
+  - article sans famille, ou famille absente de GAMSERIE ;
+  - point de la gamme sans valeur dans TS (saisissez « - » si le point ne s'applique pas à l'article) ;
+  - valeur TS sur un code qui n'existe pas dans la gamme de la famille.
+- Quand il y a des incohérences, un bandeau « Paramétrage incomplet » s'affiche aussi sur l'écran principal.
 
 ## Travailler à plusieurs (plusieurs PC, un seul classeur)
 

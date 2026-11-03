@@ -533,3 +533,19 @@ body.rz-active *{cursor:col-resize!important}
   td.mes.in{background:#eaf6ee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   td.mes.out{background:#fbe4e1!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* --- Cohérence du paramétrage --- */
+.nbinc{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:var(--amber);color:#fff;font-size:11px;font-weight:600;line-height:1;vertical-align:1px}
+.incgrp{margin:0 0 22px}
+.incgrp h3{margin:0 0 4px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px}
+.incgrp > .hint{margin:0 0 8px;max-width:95ch}
+table.flat.inc td{padding:7px 10px;vertical-align:middle}
+table.flat.inc td.act3{white-space:nowrap;text-align:right}
+table.flat.inc td.act3 .btn + .btn{margin-left:6px}
+.w-act2{width:220px}
+.ok-empty b{color:var(--ok)}
+.incmenu .btn{color:var(--ink)}
+.form1{display:grid;gap:12px;min-width:min(420px,80vw)}
+.form1 label{display:grid;gap:5px;font-size:13px;color:var(--ink2)}
+.form1 input,.form1 select{width:100%;padding:8px 10px;border:1px solid var(--rule);border-radius:var(--radius-sm);background:var(--field);color:var(--ink);font:inherit;font-size:14px}
+.form1 input:focus,.form1 select:focus{outline:2px solid var(--accent);outline-offset:-1px}
