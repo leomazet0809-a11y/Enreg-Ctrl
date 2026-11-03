@@ -55,9 +55,10 @@ Un onglet **Mode d'emploi** rappelle ces règles dans le classeur. Vos propres o
 Les onglets **GAMSERIE**, **TS** et **Matrice** se modifient directement dans Excel : ajouter des lignes (nouvel article, nouvelle spécification…), corriger une valeur, une tolérance, un fournisseur, etc.
 
 1. Ouvrez le classeur dans Excel, faites vos modifications, **enregistrez et fermez** le classeur.
-2. Revenez dans l'application :
-   - si l'application était déjà ouverte, elle détecte la modification et reprend les données toute seule ;
-   - sinon, ouvrez le classeur depuis l'écran d'accueil.
+2. Les données du classeur sont rechargées dans l'application :
+   - à l'ouverture de l'application ou au rafraîchissement de la page : le dernier classeur est rechargé directement si le navigateur a gardé l'autorisation d'y accéder (sinon, cliquez sur **Reprendre « … »** à l'accueil) ;
+   - quand vous revenez dans l'application (changement de fenêtre ou d'onglet) ;
+   - à chaque enregistrement : le classeur est relu juste avant d'écrire, les modifications Excel sont intégrées puis réécrites avec celles de l'application. Si le classeur était bloqué par Excel, il est relu à nouveau dès qu'il se libère.
 3. Un message indique les onglets repris. Enregistrez (**Ctrl + S**) pour mettre le classeur à jour.
 
 Bon à savoir :

@@ -1051,6 +1051,9 @@ function importerTableau(base, rows, mode, source){
           REFCOLS.forEach(function(c){ var k = refIdx[c.k]; row[c.k] = k>-1 ? t(r2[k]) : ''; });
           m.push(row);
         }
+        /* champs internes absents des colonnes du fichier : repris de la ligne existante du même article */
+        var anciens = {}; DB.matrice.forEach(function(x){ if(!anciens[x.article]) anciens[x.article] = x; });
+        m.forEach(function(row){ var x = anciens[row.article]; if(x) for(var k in x) if(!(k in row)) row[k] = x[k]; });
         DB.matrice = (mode === 'remplacer') ? m : fusionCle(DB.matrice, m, 'article');
       }
       else if(base === 'ts'){
