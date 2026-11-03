@@ -2343,11 +2343,7 @@ function psetDocuments(){
 
 function psetSauvegarde(){
   var info = infoClasseur();
-  return '<div class="kv"><span>GAMSERIE : <b>'+DB.gamserie.length+'</b> lignes</span><span>TS : <b>'+DB.ts.length+'</b> articles</span>'
-    + '<span>Matrice : <b>'+DB.matrice.length+'</b> articles</span><span>Documents : <b>'+DOCS.length+'</b> ('+ko(docSize())+')</span>'
-    + '<span>Rapports enregistrés : <b>'+REPORTS.length+'</b></span>'
-    + '<span>Révisions figées : <b>'+HIST.length+'</b></span><span>Journal : <b>'+JOURNAL.length+'</b> évènements</span></div>'
-    + '<div class="carte-classeur"><div class="cc-ico">'+ICONES.excel+'</div><div>'
+  return '<div class="carte-classeur"><div class="cc-ico">'+ICONES.excel+'</div><div>'
     + '<div class="cc-nom">' + (info.nom ? esc(info.nom) : 'Aucun classeur choisi') + '</div>'
     + '<div class="hint">' + (info.nom
         ? (info.enregistreLe ? 'Dernier enregistrement à ' + info.enregistreLe : 'Pas encore enregistré pendant cette session')
