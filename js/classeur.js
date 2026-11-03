@@ -66,6 +66,14 @@ function majBarreFichier(){
     el.innerHTML = '<span class="f-ico">' + ICONES.excel + '</span>'
       + '<span class="f-txt"><b>' + esc(CLASSEUR.nom || 'Nouveau projet') + '</b><span><i class="pastille"></i>' + etat + '</span></span>';
   }
+  /* disquette du ruban : blanche si le classeur Excel correspond à l'application, orange sinon */
+  var bs = document.getElementById('b-enregistrer');
+  if(bs){
+    var aJour = !!CLASSEUR.nom && !CLASSEUR.modifie && !CLASSEUR.ecritureEnCours;
+    bs.classList.toggle('a-enregistrer', !aJour);
+    bs.setAttribute('data-tip', aJour ? 'Enregistrer dans le classeur Excel (Ctrl+S) — le classeur est à jour'
+      : 'Enregistrer dans le classeur Excel (Ctrl+S) — des données ne sont pas encore dans le classeur');
+  }
   document.title = (CLASSEUR.modifie ? '● ' : '') + (CLASSEUR.nom ? CLASSEUR.nom.replace(/\.xlsx$/i,'') + ' — ' : '') + 'Enregistrements Contrôles';
 }
 
@@ -429,7 +437,7 @@ async function ecrireClasseur(h, sansFusion){
     masquerAttente();
     CLASSEUR.ecritureEnCours = false;
     majBarreFichier(); majEtatSauvegarde();
-    if(VIEW === 'parametres' && PSET === 'sauvegarde') render();
+    if(PARAM_OUVERT && PARAM_ONGLET === 'sauvegarde') rendrePanneauParam();
   }
 }
 /* Navigateur sans accès direct aux fichiers : téléchargement d'une copie */

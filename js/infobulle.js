@@ -13,14 +13,14 @@
     'acc-nouveau': 'Créer un nouveau classeur Excel à l\'emplacement de votre choix',
     'acc-demo':    'Essayer l\'application avec des données d\'exemple, sans classeur',
     'acc-reprendre': 'Rouvrir le dernier classeur utilisé sur ce poste',
-    'b-enregistrer':'Enregistrer dans le classeur Excel (Ctrl+S)',
     'b-fermer':    'Fermer le rapport et revenir aux rapports enregistrés',
+    'pp-fermer':   'Fermer les paramètres',
     'p-fermer':    'Fermer et revenir aux rapports enregistrés',
     'a-fermer':    'Fermer les analyses et revenir aux rapports enregistrés',
     'h-nouveau':   'Commencer un nouveau rapport de contrôle',
     'h-analyse':   'Analyses des dérives : cartes de contrôle et tendances des mesures',
     'h-referentiel':'Référentiel : gammes, valeurs TS, matrice, cohérence, révisions et documents',
-    'h-parametres':'Paramètres : sauvegarde du classeur et affichage',
+    'h-parametres':'Paramètres : sauvegarde du classeur et affichage (fenêtre en haut à droite)',
     'h-reprendre': 'Reprendre la saisie du rapport en cours',
     'h-abandon':   'Abandonner le rapport en cours (les saisies sont perdues)',
     'h-incoh':     'Voir les incohérences du paramétrage',
@@ -101,6 +101,7 @@
     var t = el.getAttribute('data-tip');
     if(t) return t;
     if(el.hasAttribute('data-pset')) return PAR_ONGLET[el.getAttribute('data-pset')] || el.textContent.trim();
+    if(el.hasAttribute('data-ponglet')) return PAR_ONGLET[el.getAttribute('data-ponglet')] || el.textContent.trim();
     for(var i=0;i<PAR_ATTR.length;i++) if(PAR_ATTR[i][1] && el.hasAttribute(PAR_ATTR[i][0])) return PAR_ATTR[i][1];
     return el.getAttribute('aria-label') || el.textContent.replace(/\s+/g,' ').trim();
   }
