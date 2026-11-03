@@ -1203,8 +1203,10 @@ function totaux2(rep){ var s = R; R = rep; var t = totaux(); R = s; return t; }
 function render(){
   document.querySelectorAll('.nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.view === VIEW ? 'true' : 'false'); });
   majBarreFichier();
-  var mt = document.getElementById('menu-top');
-  if(mt) mt.hidden = VIEW !== 'historique';   // nouveau rapport, analyses, paramètres : depuis le menu principal uniquement
+  ['analyse','parametres'].forEach(function(v){
+    var bt = document.getElementById('h-' + v);
+    if(bt) bt.setAttribute('aria-current', VIEW === v ? 'true' : 'false');
+  });
   var m = document.getElementById('main');
   if(VIEW === 'rapport') m.innerHTML = viewRapport();
   else if(VIEW === 'historique') m.innerHTML = viewHistorique();
@@ -1241,7 +1243,7 @@ function viewRapport(){
   h += champ('Commande', '<input id="f-commande" value="'+esc(R.commande)+'"'+rdo+'>');
   h += champ('Fournisseur', '<input id="f-fournisseur" value="'+esc(R.fournisseur)+'"'+rdo+'>');
   h += champ('Contrôleur', '<input id="f-controleur" value="'+esc(R.controleur)+'"'+rdo+'>');
-  h += champ('Date', '<input type="date" id="f-date" value="'+esc(R.date)+'"'+rdo+'>');
+  h += champ('Date', '<input type="date" id="f-date" value="'+esc(R.date)+'" readonly tabindex="-1" class="auto" title="Date d\'ouverture du rapport, renseignée automatiquement">');
   h += '</div>';
   h += '<div class="hdr">';
   h += champ('Quantité commandée', '<input id="f-qteCommandee" inputmode="decimal" value="'+esc(R.qteCommandee)+'"'+rdo+'>', 'num');
@@ -1466,7 +1468,9 @@ function viewHistorique(){
   });
   /* Menu principal : accès aux rapports, aux analyses et aux paramètres */
   var h = '<div class="sheet"><div class="menuhead"><h2 class="sec">Rapports enregistrés</h2>'
-     + '</div><div class="pad">';
+     + '<button class="btn-nouveau" id="h-nouveau" type="button" title="Nouveau rapport" aria-label="Nouveau rapport">'
+     + '<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M12 11v6M9 14h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+     + '</button></div><div class="pad">';
   if(brouillonEnCours()){
     h += '<div class="encours"><span><b>Rapport en cours, non enregistré</b> — '
       + esc([R.article || 'sans article', R.lot ? 'lot ' + R.lot : ''].filter(Boolean).join(' · ')) + '</span>'
@@ -1481,7 +1485,7 @@ function viewHistorique(){
      + '<span class="hint" id="q-count">'+list.length+' rapport'+(list.length>1?'s':'')+'</span>'
      + '<span class="hint" style="margin-left:auto">Cliquez sur un rapport pour l\'ouvrir.</span></div>';
   if(!list.length){
-    h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur le bouton « Nouveau rapport » en haut de page pour commencer un contrôle.</div>';
+    h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur le bouton « Nouveau rapport » à droite du titre pour commencer un contrôle.</div>';
   } else {
     h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Lot / Commande</div><div>Date</div><div>Échant. / rév.</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
     list.forEach(function(r){
@@ -1630,6 +1634,7 @@ function viewParametres(){
     + '<button data-pset="revisions" aria-current="'+(PSET==='revisions')+'">Révisions</button>'
     + '<button data-pset="documents" aria-current="'+(PSET==='documents')+'">Documents ('+DOCS.length+')</button>'
     + '<button data-pset="sauvegarde" aria-current="'+(PSET==='sauvegarde')+'">Sauvegarde</button>'
+    + '<button data-pset="affichage" aria-current="'+(PSET==='affichage')+'">Affichage</button>'
     + '</div><div class="pad">';
   if(PSET === 'gamserie') h += psetGamserie();
   else if(PSET === 'ts') h += psetTS();
@@ -1637,6 +1642,7 @@ function viewParametres(){
   else if(PSET === 'documents') h += psetDocuments();
   else if(PSET === 'revisions') h += psetRevisions();
   else if(PSET === 'coherence') h += psetCoherence();
+  else if(PSET === 'affichage') h += psetAffichage();
   else h += psetSauvegarde();
   h += '</div></div>';
   return h;
@@ -2042,6 +2048,38 @@ function psetMatrice(){
   h += '</tbody></table></div>';
   return h;
 }
+/* --- Affichage : taille du texte, mémorisée sur ce poste --- */
+var TAILLES = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
+function tailleTexte(){
+  var z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--zoom'));
+  return isFinite(z) && z > 0 ? z : 1;
+}
+function appliquerTaille(z){
+  z = Math.round(Math.min(1.5, Math.max(0.8, z)) * 100) / 100;
+  document.documentElement.style.setProperty('--zoom', z);
+  try{ if(z === 1) localStorage.removeItem('ec.police'); else localStorage.setItem('ec.police', String(z)); }catch(e){}
+}
+function changerTaille(sens){
+  var z = tailleTexte(), i = 0;
+  while(i < TAILLES.length - 1 && TAILLES[i] < z - 0.001) i++;
+  if(sens > 0 && TAILLES[i] <= z + 0.001) i = Math.min(TAILLES.length - 1, i + 1);
+  else if(sens < 0) i = Math.max(0, (TAILLES[i] >= z - 0.001 ? i - 1 : i));
+  appliquerTaille(sens === 0 ? 1 : TAILLES[i]);
+  render();
+}
+function psetAffichage(){
+  var z = tailleTexte();
+  return '<h3 style="margin:0 0 4px;font-size:14px;font-weight:600">Taille du texte</h3>'
+    + '<p class="hint" style="margin:0 0 8px">Agrandit ou réduit tout l\'affichage de l\'application. Le réglage est mémorisé sur ce poste.</p>'
+    + '<div class="taille">'
+    + '<button class="btn" id="t-moins" title="Réduire" aria-label="Réduire la taille du texte"'+(z <= TAILLES[0] + 0.001 ? ' disabled' : '')+'>A−</button>'
+    + '<span class="val" id="t-val">' + Math.round(z * 100) + ' %</span>'
+    + '<button class="btn" id="t-plus" title="Agrandir" aria-label="Agrandir la taille du texte"'+(z >= TAILLES[TAILLES.length-1] - 0.001 ? ' disabled' : '')+'>A+</button>'
+    + '<button class="btn sm" id="t-reset"'+(Math.abs(z - 1) < 0.001 ? ' disabled' : '')+'>Taille normale (100 %)</button>'
+    + '</div>'
+    + '<div class="apercu"><b>Aperçu</b> — Rapport de contrôle 041038_CBMI · lot L-42 · cote mesurée <span class="mono">13,02</span></div>';
+}
+
 /* --- Cohérence du paramétrage : Matrice / GAMSERIE / TS --- */
 var LIB_INC = {
   sansfam:  {titre:'Articles sans famille', aide:'Aucune famille dans la Matrice : le rapport de ces articles ne peut pas être construit.'},
@@ -2434,7 +2472,7 @@ function setupColResize(){
 }
 
 function bindRapport(){
-  ['lot','commande','fournisseur','controleur','date','qteCommandee','qteReceptionnee','dureeControle','commentaires'].forEach(function(f){
+  ['lot','commande','fournisseur','controleur','qteCommandee','qteReceptionnee','dureeControle','commentaires'].forEach(function(f){
     var el = document.getElementById('f-'+f);
     if(el) el.oninput = function(){
       R[f] = el.value;
@@ -2556,7 +2594,7 @@ function bindRapport(){
 
   var b;
   if(b = document.getElementById('b-rebasculer')) b.onclick = rebasculer;
-  if(b = document.getElementById('b-fermer')) b.onclick = fermerRapport;
+  if(b = document.getElementById('b-fermer')) b.onclick = function(){ fermerRapport(); };
   if(b = document.getElementById('b-vider')) b.onclick = function(){
     if(!confirm('Effacer toutes les mesures de ce rapport ?')) return;
     R.mesures = R.lignes.map(function(){ var r=[]; for(var j=0;j<nbPieces();j++) r.push(''); return r; });
@@ -2661,7 +2699,7 @@ function enregistrerAuto(immediat){
 function etatSauvegarde(){
   var m = champsManquants();
   if(m.length) return '<span class="ko">Non enregistré — ' + m.map(function(c){ return esc(c.nom); }).join(', ') + ' à renseigner</span>';
-  if(estModifie()) return '<span class="okk">Rapport complet — à enregistrer dans le classeur (Ctrl+S)</span>';
+  if(estModifie()) return '<span class="aen">Rapport complet — à enregistrer dans le classeur (Ctrl+S)</span>';
   return '<span class="okk">Enregistré dans le classeur</span>';
 }
 function majEtatSauvegarde(){
@@ -2669,7 +2707,8 @@ function majEtatSauvegarde(){
   if(e) e.innerHTML = etatSauvegarde();
 }
 /* Fermeture du rapport : retour aux rapports enregistrés */
-function fermerRapport(){
+function fermerRapport(cible){
+  cible = cible || 'historique';
   var manque = champsManquants();
   if(manque.length && (R.article || R.lot || R.lignes.length)){
     modal('Rapport non enregistré',
@@ -2677,7 +2716,7 @@ function fermerRapport(){
       + '<ul>' + manque.map(function(c){ return '<li><b>' + esc(c.nom) + '</b></li>'; }).join('') + '</ul>'
       + '<p style="margin:12px 0 0">Si vous fermez maintenant, il reste en brouillon : vous le retrouverez avec le bouton « Reprendre » de l\'écran Rapports enregistrés.</p>'
       + (estModifie() ? '<p style="margin:12px 0 0"><b style="color:var(--amber)">Le contenu de l\'application n\'est pas enregistré dans le classeur Excel.</b></p>' : ''),
-      function(){ VIEW = 'historique'; render(); }, 'Fermer quand même');
+      function(){ VIEW = cible; render(); }, 'Fermer quand même');
     var ft = document.querySelector('.modal .ft');
     ft.innerHTML = '<button class="btn" data-x3>Compléter</button><button class="btn pri" data-ok3>Fermer quand même</button>';
     ft.querySelector('[data-x3]').onclick = function(){
@@ -2686,15 +2725,16 @@ function fermerRapport(){
       var first = document.getElementById(manque[0].id);
       if(first){ first.focus(); if(first.select) first.select(); }
     };
-    ft.querySelector('[data-ok3]').onclick = function(){ document.querySelector('.modal').remove(); VIEW = 'historique'; render(); };
+    ft.querySelector('[data-ok3]').onclick = function(){ document.querySelector('.modal').remove(); VIEW = cible; render(); };
     return;
   }
   enregistrerAuto(true);
-  if(estModifie()){ confirmerFermetureRapport(); return; }
-  VIEW = 'historique'; render();
+  if(estModifie()){ confirmerFermetureRapport(cible); return; }
+  VIEW = cible; render();
 }
 /* Contenu non enregistré dans le classeur Excel : confirmation avant de quitter le rapport */
-function confirmerFermetureRapport(){
+function confirmerFermetureRapport(cible){
+  cible = cible || 'historique';
   modal('Modifications non enregistrées',
     '<p style="margin:0">Le contenu de l\'application <b>n\'est pas enregistré dans le classeur Excel</b>.</p>'
     + '<p style="margin:10px 0 0">Êtes-vous certain de vouloir fermer le rapport ?</p>',
@@ -2705,14 +2745,27 @@ function confirmerFermetureRapport(){
     + '<button class="btn pri" data-enreg>Enregistrer et fermer</button>';
   function fermerModal(){ var m = document.querySelector('.modal'); if(m) m.remove(); }
   ft.querySelector('[data-annuler]').onclick = fermerModal;
-  ft.querySelector('[data-fermer]').onclick = function(){ fermerModal(); VIEW = 'historique'; render(); };
+  ft.querySelector('[data-fermer]').onclick = function(){ fermerModal(); VIEW = cible; render(); };
   ft.querySelector('[data-enreg]').onclick = async function(){
     fermerModal();
     await enregistrer();
-    if(!estModifie() && VIEW === 'rapport'){ VIEW = 'historique'; render(); }
+    if(!estModifie() && VIEW === 'rapport'){ VIEW = cible; render(); }
   };
   ft.querySelector('[data-enreg]').focus();
 }
+
+/* Ruban : Analyses et Paramètres accessibles depuis n'importe quel écran.
+   Depuis un rapport, mêmes vérifications qu'à la fermeture du rapport. */
+function allerVers(v){
+  if(VIEW === v) return;
+  if(VIEW === 'rapport'){ fermerRapport(v); return; }
+  VIEW = v; render();
+}
+(function(){
+  var a = document.getElementById('h-analyse'), p = document.getElementById('h-parametres');
+  if(a) a.onclick = function(){ allerVers('analyse'); };
+  if(p) p.onclick = function(){ allerVers('parametres'); };
+})();
 
 function bindHistorique(){
   var q = document.getElementById('q');
@@ -2724,8 +2777,6 @@ function bindHistorique(){
     R = newReport(); saveDraft(); VIEW = 'rapport'; render();
   };
   var b;
-  if(b = document.getElementById('h-analyse')) b.onclick = function(){ VIEW = 'analyse'; render(); };
-  if(b = document.getElementById('h-parametres')) b.onclick = function(){ VIEW = 'parametres'; render(); };
   if(b = document.getElementById('h-incoh')) b.onclick = function(){ VIEW = 'parametres'; PSET = 'coherence'; render(); };
   if(b = document.getElementById('h-reprendre')) b.onclick = function(){ VIEW = 'rapport'; render(); };
   if(b = document.getElementById('h-abandon')) b.onclick = function(){
@@ -2856,6 +2907,9 @@ function bindParametres(){
   if(b = document.getElementById('ts-imp-m')) b.onclick = function(){ importCSV('ts','maj'); };
 
   if(b = document.getElementById('m-add')) b.onclick = creerArticle;
+  if(b = document.getElementById('t-moins')) b.onclick = function(){ changerTaille(-1); };
+  if(b = document.getElementById('t-plus')) b.onclick = function(){ changerTaille(1); };
+  if(b = document.getElementById('t-reset')) b.onclick = function(){ changerTaille(0); };
 
   document.querySelectorAll('[data-incfam]').forEach(function(x){ x.onclick = function(){ choisirFamille(x.dataset.incfam); }; });
   document.querySelectorAll('[data-incts]').forEach(function(x){

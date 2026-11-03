@@ -99,12 +99,18 @@ Conseil : confiez la modification des gammes et des valeurs (Paramètres, ou ong
 ## Navigation
 
 - L'écran principal est la liste des **Rapports enregistrés** : cliquez sur un rapport pour l'ouvrir.
-- Sur cet écran, le ruban en haut affiche trois icônes : **Nouveau rapport** (document +), **Analyses des dérives** (courbe) et **Paramètres** (roue crantée). Elles ne s'affichent que sur le menu principal : un nouveau rapport s'ouvre uniquement depuis là.
+- Le bouton **Nouveau rapport** (document +) est à droite du titre « Rapports enregistrés » : un nouveau rapport s'ouvre uniquement depuis cet écran. Sa **Date** est la date d'ouverture du rapport, renseignée automatiquement (non modifiable).
+- Le ruban en haut regroupe, sur tous les écrans, les icônes **Analyses des dérives** (courbe), **Paramètres** (roue crantée), **Enregistrer** (disquette) et mode clair / sombre. Depuis un rapport, les mêmes vérifications qu'à sa fermeture s'appliquent.
 - Dans un rapport, une pastille rouge indique le nombre de pièces non conformes à droite de chaque spécification, et le nombre de spécifications non conformes à côté du numéro de chaque pièce.
 - Les valeurs relevées s'écrivent avec une virgule : un point saisi est remplacé par une virgule dès que la cellule est validée.
 - La croix en haut à droite des écrans Rapport, Analyses et Paramètres ramène à la liste.
 - Un rapport commencé mais incomplet (article, lot ou quantité échantillon manquant) apparaît dans un bandeau « Rapport en cours » avec un bouton **Reprendre**.
+- Chaque bouton affiche une info-bulle qui précise son action après une seconde de survol.
 - L'affichage s'adapte à la taille de l'écran (grand écran, portable, tablette, téléphone).
+
+## Taille du texte
+
+*Paramètres → Affichage* : boutons **A−** et **A+** (de 80 % à 150 %) et retour à la taille normale. Le réglage est mémorisé sur le poste.
 
 ## Mode clair / sombre
 
@@ -116,6 +122,6 @@ L'application peut aussi être publiée avec **GitHub Pages** (Settings → Page
 
 ## Pour information technique
 
-- Application statique : `index.html`, `css/app.css`, `js/app.js` (logique métier), `js/classeur.js` (lecture / écriture du classeur).
+- Application statique : `index.html`, `css/app.css`, `js/app.js` (logique métier), `js/classeur.js` (lecture / écriture du classeur), `js/partage.js` (travail à plusieurs), `js/infobulle.js` (info-bulles).
 - Lecture et écriture Excel : bibliothèque [SheetJS](https://sheetjs.com) incluse dans `lib/` (fonctionne sans connexion internet).
 - Accès au fichier : API *File System Access* de Chrome / Edge. Dans un autre navigateur, chaque enregistrement télécharge une copie du classeur.
