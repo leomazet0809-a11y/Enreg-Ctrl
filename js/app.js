@@ -847,10 +847,10 @@ function codesUtilises(){
 function exportTS(){ download('TS.csv', toCSV(tableauTS())); }
 function tableauTS(){
   var rows = [['Révision','Date de révision','Statut','Indice de définition','Article','Famille','Code',
-               'Spécification','Type spéc.','Type saisie','Nominal','Tol -','Tol +','Mini.','Maxi.']];
+               'Type spéc.','Type saisie','Nominal','Tol -','Tol +','Mini.','Maxi.']];
   lignesTS().forEach(function(l){
     rows.push([l.rev===null?'':l.rev, l.dateRev?frDate(l.dateRev):'', l.statut, l.indiceDef,
-      l.article, l.famille, l.code, l.specification, l.typeSpec||'', l.type,
+      l.article, l.famille, l.code, l.typeSpec||'', l.type,
       l.brut[0], l.brut[1], l.brut[2],
       l.mini===null?'':l.mini, l.maxi===null?'':l.maxi]);
   });
@@ -1203,6 +1203,8 @@ function totaux2(rep){ var s = R; R = rep; var t = totaux(); R = s; return t; }
 function render(){
   document.querySelectorAll('.nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.view === VIEW ? 'true' : 'false'); });
   majBarreFichier();
+  var mt = document.getElementById('menu-top');
+  if(mt) mt.hidden = VIEW !== 'historique';   // nouveau rapport, analyses, paramètres : depuis le menu principal uniquement
   var m = document.getElementById('main');
   if(VIEW === 'rapport') m.innerHTML = viewRapport();
   else if(VIEW === 'historique') m.innerHTML = viewHistorique();
@@ -1380,7 +1382,6 @@ function viewRapport(){
   if(R.decision === 'Accepté') h += '<button class="btn" id="b-mvtA" title="Changement de stock X3 : statut Q → A">Mouvement X3 statut A</button>';
   else if(R.decision === 'Refusé') h += '<button class="btn" id="b-mvtR" title="Changement de stock X3 : statut Q → R">Mouvement X3 statut R</button>';
   h += '<button class="btn" id="b-vider"'+dis+'>Vider les mesures</button>';
-  h += '<button class="btn" id="b-nouveau">Nouveau rapport</button>';
   h += '<button class="btn" id="b-csv">Exporter en CSV</button>';
   h += '<button class="btn" id="b-print">Imprimer / PDF</button>';
   h += '</div></div>';
@@ -1455,6 +1456,8 @@ function docPaneRapport(){
 }
 
 /* ---------- vue historique ---------- */
+/* Information secondaire d'une ligne de la liste, sur la même ligne (lignes fines) */
+function sousInfo(x){ x = String(x||'').trim(); return x ? ' <span class="hint">· ' + esc(x) + '</span>' : ''; }
 function viewHistorique(){
   var list = REPORTS.slice().sort(function(a,b){
     var da = String(a.date||''), db = String(b.date||'');
@@ -1463,11 +1466,7 @@ function viewHistorique(){
   });
   /* Menu principal : accès aux rapports, aux analyses et aux paramètres */
   var h = '<div class="sheet"><div class="menuhead"><h2 class="sec">Rapports enregistrés</h2>'
-     + '<div class="menuact">'
-     + '<button class="btn" id="h-analyse">'+ICO_MENU.analyse+'<span>Analyses des dérives</span></button>'
-     + '<button class="btn" id="h-parametres">'+ICO_MENU.reglages+'<span>Paramètres</span></button>'
-     + '<button class="btn pri" id="h-nouveau">'+ICO_MENU.plus+'<span>Nouveau rapport</span></button>'
-     + '</div></div><div class="pad">';
+     + '</div><div class="pad">';
   if(brouillonEnCours()){
     h += '<div class="encours"><span><b>Rapport en cours, non enregistré</b> — '
       + esc([R.article || 'sans article', R.lot ? 'lot ' + R.lot : ''].filter(Boolean).join(' · ')) + '</span>'
@@ -1482,16 +1481,16 @@ function viewHistorique(){
      + '<span class="hint" id="q-count">'+list.length+' rapport'+(list.length>1?'s':'')+'</span>'
      + '<span class="hint" style="margin-left:auto">Cliquez sur un rapport pour l\'ouvrir.</span></div>';
   if(!list.length){
-    h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur « Nouveau rapport » pour commencer un contrôle.</div>';
+    h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur le bouton « Nouveau rapport » en haut de page pour commencer un contrôle.</div>';
   } else {
     h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Lot / Commande</div><div>Date</div><div>Échant. / rév.</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
     list.forEach(function(r){
       var t = totaux2(r);
       h += '<div class="r" data-open="'+r.id+'" tabindex="0" title="Ouvrir ce rapport" data-s="'+esc([r.article,r.lot,r.commande,r.fournisseur,r.controleur,r.decision].join(' ').toLowerCase())+'">'
-        + '<div><b>'+esc(r.article)+'</b><br><span class="hint">'+esc(r.fournisseur)+'</span></div>'
-        + '<div>'+esc(r.lot)+'<br><span class="hint">'+esc(r.commande)+'</span></div>'
-        + '<div>'+frDate(r.date)+'<br><span class="hint">'+esc(r.controleur)+'</span></div>'
-        + '<div>'+nbPieces2(r)+'<br><span class="hint">rév. '+(r.gamRev===null||r.gamRev===undefined?'—':r.gamRev)+' / '+(r.tsRev===null||r.tsRev===undefined?'—':r.tsRev)+'</span></div>'
+        + '<div><b>'+esc(r.article)+'</b>'+sousInfo(r.fournisseur)+'</div>'
+        + '<div>'+esc(r.lot)+sousInfo(r.commande)+'</div>'
+        + '<div>'+frDate(r.date)+sousInfo(r.controleur)+'</div>'
+        + '<div>'+nbPieces2(r)+sousInfo('rév. '+(r.gamRev===null||r.gamRev===undefined?'—':r.gamRev)+' / '+(r.tsRev===null||r.tsRev===undefined?'—':r.tsRev))+'</div>'
         + '<div><span style="color:var(--ok);font-weight:700">'+t.conforme+' C</span> / <span style="color:var(--nc);font-weight:700">'+t.nonConforme+' NC</span></div>'
         + '<div><span class="tag '+(r.decision==='Accepté'?'a':r.decision==='Refusé'?'r':r.decision==='Attente décision méthodes'?'att':'d')+'">'+esc(libDecision(r.decision))+'</span></div>'
         + '<div class="act2">'
@@ -1860,7 +1859,7 @@ function psetTS(){
   h += '<div class="scroll tall"><table class="flat" data-tbl="ts"><thead><tr>'
     + thf('ts','rev','Rév.','w-rev') + thf('ts','date','Date rév.','w-date') + thf('ts','statut','Statut','w-st')
     + thf('ts','article','Article','w-art') + thf('ts','famille','Famille','w-fam') + thf('ts','code','Code','w-code')
-    + thf('ts','spec','Spécification','') + thf('ts','typespec','Type spéc.','w-type') + thf('ts','typesaisie','Type saisie','w-type')
+    + thf('ts','typespec','Type spéc.','w-type') + thf('ts','typesaisie','Type saisie','w-type')
     + thf('ts','nom','Nominal','w-val') + thf('ts','tolm','Tol -','w-val')
     + thf('ts','tolp','Tol +','w-val') + thf('ts','mini','Mini.','w-val') + thf('ts','maxi','Maxi.','w-val')
     + '</tr></thead><tbody>';
@@ -1874,7 +1873,6 @@ function psetTS(){
       + td('article', l.article, (debut ? '<b>'+esc(l.article)+'</b>' + (l.indiceDef ? '<br><span class="hint">'+esc(l.indiceDef)+'</span>' : '') : esc(l.article)), 'art' + (debut?'':' sub'))
       + td('famille', l.famille, esc(l.famille||'—'), 'fam')
       + td('code', l.code, esc(l.code), 'cd')
-      + td('spec', l.specification, esc(l.specification), 'sp')
       + tdTypeSpec(l)
       + td('typesaisie', l.type, l.type, 'ty')
       + tdVal(l, 0, 'nom') + tdVal(l, 1, 'tolm') + tdVal(l, 2, 'tolp')
@@ -2412,6 +2410,7 @@ function setupColResize(){
   });
   /* --- listes en grille CSS (rapports enregistrés, documents) --- */
   document.querySelectorAll('.rowlist[data-list]').forEach(function(rl){
+    if(rl.getAttribute('data-list') === 'rapports') return;   // largeurs de colonnes fixes
     var isDoc = rl.getAttribute('data-list') === 'docs';
     var rowSel = isDoc ? '.docrow' : '.r', varName = isDoc ? '--dcols' : '--cols';
     var head = rl.querySelector(rowSel + '.head'); if(!head) return;
@@ -2558,10 +2557,6 @@ function bindRapport(){
   var b;
   if(b = document.getElementById('b-rebasculer')) b.onclick = rebasculer;
   if(b = document.getElementById('b-fermer')) b.onclick = fermerRapport;
-  if(b = document.getElementById('b-nouveau')) b.onclick = function(){
-    if(!confirm('Ouvrir un nouveau rapport vierge ? Le rapport en cours sera perdu s\'il n\'est pas enregistré.')) return;
-    R = newReport(); saveDraft(); render();
-  };
   if(b = document.getElementById('b-vider')) b.onclick = function(){
     if(!confirm('Effacer toutes les mesures de ce rapport ?')) return;
     R.mesures = R.lignes.map(function(){ var r=[]; for(var j=0;j<nbPieces();j++) r.push(''); return r; });
@@ -2772,11 +2767,6 @@ function filtreRapports(){
 function brouillonEnCours(){
   return !!(R && (R.article || R.lot) && !byId(R.id));
 }
-var ICO_MENU = {
-  analyse:'<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 19h16M6 15l4-5 3 3 5-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  reglages:'<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
-  plus:'<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
-};
 function byId(id){ for(var i=0;i<REPORTS.length;i++) if(REPORTS[i].id === id) return REPORTS[i]; return null; }
 
 function bindParametres(){
