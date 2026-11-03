@@ -354,8 +354,9 @@ body.viewer .viewpane{display:flex}
 .bar-use i{display:block;height:100%;background:var(--accent);border-radius:4px}
 
 /* ---------- rapport figé, moyens, cartes de contrôle ---------- */
-.figebar{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--amberbg);border-bottom:1px solid var(--amberbd);color:var(--amber);font-size:13px}
-.figebar .lock{font-size:14px}
+.cadenas{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;color:var(--ink2);background:none;border:0;padding:0;border-radius:var(--radius-sm)}
+button.cadenas{cursor:pointer}
+button.cadenas:hover{background:var(--hover);color:var(--ink)}
 .sheet.fige input[readonly],.sheet.fige input[disabled],.sheet.fige select[disabled],.sheet.fige textarea[readonly]{background:var(--subtle);color:var(--ink2);cursor:not-allowed}
 .sheet.fige button.q[disabled]{opacity:.65;cursor:not-allowed}
 .c-moy{width:96px;text-align:left}

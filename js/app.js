@@ -1406,13 +1406,6 @@ function viewRapport(){
     + '<button class="close noprint" id="b-fermer" title="Fermer et revenir aux rapports enregistrés" aria-label="Fermer le rapport">'
     + '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>'
     + '</button></div>';
-  if(ro){
-    h += '<div class="figebar noprint"><span class="lock">🔒</span> Rapport figé — statut <b>'+esc(libDecision(R.decision))+'</b>. '
-      + (statutVerrouille()
-          ? 'Modifiable uniquement après réouverture par un méthodiste.'
-          : 'Modifiez le statut (Accepté / Refusé / Sans décision) pour le débloquer.')
-      + (statutVerrouille() ? '<button class="btn sm" id="b-rouvrir" style="margin-left:auto">Rouvrir (méthodiste)</button>' : '') + '</div>';
-  }
   h += '<div class="hdr">';
   h += champ('Article', '<input list="dl-art" id="f-article" value="'+esc(R.article)+'" placeholder="Saisir ou choisir…" autocomplete="off"'+rdo+'>');
   h += champ('Lot', '<input id="f-lot" value="'+esc(R.lot)+'"'+rdo+'>');
@@ -1541,6 +1534,13 @@ function viewRapport(){
   h += '<select id="f-statut" class="'+stCls+'"'+(statutVerrouille()?' disabled':'')+' style="border:1px solid var(--rule);padding:5px 9px;border-radius:2px">'
     + STATUTS.map(function(s){ return '<option value="'+esc(s)+'"'+(R.decision===s?' selected':'')+'>'+esc(libDecision(s))+'</option>'; }).join('')
     + '</select>';
+  /* Rapport figé : cadenas à droite du statut (plus de bandeau). Accepté / Refusé : clic = réouverture méthodiste. */
+  if(ro){
+    var cad = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+    h += statutVerrouille()
+      ? '<button type="button" class="cadenas" id="b-rouvrir" title="Rapport figé — cliquez pour le rouvrir (méthodiste)" aria-label="Rapport figé — rouvrir (méthodiste)">'+cad+'</button>'
+      : '<span class="cadenas" title="Rapport figé — modifiez le statut pour le débloquer" aria-label="Rapport figé">'+cad+'</span>';
+  }
   if(R.decision === 'Refusé'){
     var subs = []; TYPES_NC.forEach(function(x){ if(x.t === R.typeNC) subs = x.sous; });
     h += '<label class="barlab">Type NC</label>'
