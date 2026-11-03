@@ -1795,6 +1795,9 @@ function viewParametres(){
   var titre = ref ? 'Référentiel' : 'Paramètres';
   var h = '<div class="sheet">'
     + '<div class="rbar"><b>' + titre + '</b>'
+    + (ref ? '<button class="btn sm btn-actualiser" id="r-actualiser" type="button">'
+        + '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        + '<span>Actualiser</span></button>' : '')
     + '<button class="close noprint" id="p-fermer" title="Fermer et revenir aux rapports enregistrés" aria-label="Fermer ' + (ref ? 'le référentiel' : 'les paramètres') + '">'
     + '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>'
     + '</button></div>'
@@ -2992,6 +2995,8 @@ function brouillonEnCours(){
 function byId(id){ for(var i=0;i<REPORTS.length;i++) if(REPORTS[i].id === id) return REPORTS[i]; return null; }
 
 function bindParametres(){
+  var ra = document.getElementById('r-actualiser');
+  if(ra) ra.onclick = actualiserDepuisExcel;
   var pf = document.getElementById('p-fermer');
   if(pf) pf.onclick = function(){ VIEW = 'historique'; render(); };
   document.querySelectorAll('[data-pset]').forEach(function(b){ b.onclick = function(){ PSET = b.dataset.pset; render(); }; });
