@@ -171,7 +171,7 @@ function integrerFeuillesExcel(wb, tout){
   FEUILLES_EDITABLES.forEach(function(f, i){
     var ws = wb.Sheets[f.feuille]; if(!ws) return;
     var rows = lignesFeuille(ws), ref = refs[i];
-    if(f.base === 'ts') rows = sansColonne(sansColonne(rows, 'specification'), 'indice de definition');   // anciennes colonnes informatives de TS
+    if(f.base === 'ts') ['specification', 'indice de definition', 'mini.', 'maxi.'].forEach(function(c){ rows = sansColonne(rows, c); });   // anciennes colonnes informatives de TS
     /* classeur antérieur aux identifiants de points : pas de colonne ID dans l'onglet */
     if(rows.length && sansColonne(rows.slice(0, 1), 'id')[0].length === rows[0].length) ref = sansColonne(ref, 'id');
     if(!tout && empreinte(rows) === empreinte(ref)) return;
@@ -310,13 +310,13 @@ function feuilleModeEmploi(){
     [''],
     ['Onglet', 'Modifiable dans Excel', 'Contenu'],
     ['GAMSERIE', 'Oui', 'Gammes de contrôle : une ligne par point de contrôle (ID, Famille Méthode, Code, Criticité, Spécification, Moyen, Méthode). L\'ID identifie le point : ne le modifiez pas ; une ligne ajoutée sans ID en reçoit un. Le code peut être vide ou en double.'],
-    ['TS', 'Oui', 'Valeurs par article : une ligne par article + point (ID du point de la gamme, Nominal, Tol -, Tol +, Type spéc. = Générale / Individuelle). Sans ID, le point est retrouvé par son code s\'il est unique dans la famille. Mini et Maxi sont recalculés.'],
+    ['TS', 'Oui', 'Valeurs par article : une ligne par article + point (ID du point de la gamme, Nominal, Tol -, Tol +, Type spéc. = Générale / Individuelle). Sans ID, le point est retrouvé par son code s\'il est unique dans la famille. Mini et Maxi (nominal + tolérances) sont calculés dans les rapports.'],
     ['Matrice', 'Oui', 'Article, code fournisseur, famille, matière, liasse et références documentaires.'],
     ['Rapports', 'Non', 'Liste des rapports enregistrés (saisie dans l\'application).'],
     ['Mesures', 'Non', 'Toutes les valeurs relevées.'],
     ['Journal', 'Non', 'Historique des révisions.'],
     [''],
-    ['Les colonnes Révision, Date de révision, Statut, Type saisie, Mini. et Maxi. sont informatives : elles sont recalculées par l\'application.'],
+    ['Les colonnes Révision, Date de révision, Statut et Type saisie sont informatives : elles sont recalculées par l\'application.'],
     ['Une gamme ou des valeurs modifiées dans Excel ouvrent une révision en brouillon, à valider dans l\'application avant de servir aux nouveaux rapports.'],
     ['Enregistrez et fermez le classeur dans Excel : l\'application attend qu\'il soit fermé pour enregistrer. Vos propres onglets supplémentaires sont conservés (sans mise en forme).'],
     ['Plusieurs postes peuvent enregistrer dans ce classeur : les rapports et les modifications de chacun sont fusionnés à chaque enregistrement.'],
