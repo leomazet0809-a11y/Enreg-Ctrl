@@ -1339,9 +1339,12 @@ function totaux2(rep){ var s = R; R = rep; var t = totaux(); R = s; return t; }
 function render(){
   document.querySelectorAll('.nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.view === VIEW ? 'true' : 'false'); });
   majBarreFichier();
+  /* Analyses et Référentiel s'ouvrent dans une fenêtre flottante au-dessus du menu principal :
+     tant qu'elle est ouverte, seuls Enregistrer et Paramètres restent accessibles dans le ruban */
+  var flottant = VIEW === 'analyse' || VIEW === 'referentiel';
   ['analyse','referentiel'].forEach(function(v){
     var bt = document.getElementById('h-' + v);
-    if(bt) bt.setAttribute('aria-current', VIEW === v ? 'true' : 'false');
+    if(bt){ bt.setAttribute('aria-current', VIEW === v ? 'true' : 'false'); bt.disabled = flottant; }
   });
   var nInc = incoherences().length, pi = document.getElementById('h-referentiel');
   if(pi){
@@ -1356,12 +1359,37 @@ function render(){
   }
   var m = document.getElementById('main');
   if(VIEW === 'rapport') m.innerHTML = viewRapport();
-  else if(VIEW === 'historique') m.innerHTML = viewHistorique();
-  else if(VIEW === 'analyse') m.innerHTML = viewAnalyse();
-  else m.innerHTML = viewParametres();
+  else m.innerHTML = viewHistorique();            // menu principal, aussi sous les fenêtres flottantes
+  var fen = document.getElementById('fenetre');
+  if(flottant){
+    if(!fen){
+      fen = document.createElement('div'); fen.id = 'fenetre'; fen.className = 'fenetre';
+      fen.innerHTML = '<div class="fen-box" role="dialog" aria-modal="true"></div>';
+      fen.addEventListener('mousedown', function(e){ if(e.target === fen) fermerFenetre(); });
+      document.body.appendChild(fen);
+    }
+    var box = fen.querySelector('.fen-box'), garde = box.scrollTop, meme = fen.getAttribute('data-vue') === VIEW;
+    box.innerHTML = VIEW === 'analyse' ? viewAnalyse() : viewParametres();
+    box.setAttribute('aria-label', VIEW === 'analyse' ? 'Analyses des dérives' : 'Référentiel');
+    fen.setAttribute('data-vue', VIEW); fen.hidden = false;
+    if(meme) box.scrollTop = garde;
+    m.inert = true; m.setAttribute('aria-hidden', 'true');
+  } else {
+    if(fen){ fen.hidden = true; fen.removeAttribute('data-vue'); fen.querySelector('.fen-box').innerHTML = ''; }
+    m.inert = false; m.removeAttribute('aria-hidden');
+  }
   bind();
   rendrePanneauParam();
 }
+/* Fermeture de la fenêtre Analyses / Référentiel : retour au menu principal */
+function fermerFenetre(){
+  if(VIEW !== 'analyse' && VIEW !== 'referentiel') return;
+  VIEW = 'historique'; render();
+}
+document.addEventListener('keydown', function(e){
+  if(e.key !== 'Escape' || document.querySelector('.modal') || (typeof PARAM_OUVERT !== 'undefined' && PARAM_OUVERT) || (typeof docOuvert !== 'undefined' && docOuvert)) return;
+  if(VIEW === 'analyse' || VIEW === 'referentiel'){ e.preventDefault(); fermerFenetre(); }
+});
 
 /* ---------- vue rapport ---------- */
 function viewRapport(){
@@ -1623,11 +1651,6 @@ function viewHistorique(){
     h += '<div class="encours"><span><b>Rapport en cours, non enregistré</b> — '
       + esc([R.article || 'sans article', R.lot ? 'lot ' + R.lot : ''].filter(Boolean).join(' · ')) + '</span>'
       + '<span class="sp"></span><button class="btn sm" id="h-abandon">Abandonner</button><button class="btn sm pri" id="h-reprendre">Reprendre</button></div>';
-  }
-  var nInc = incoherences().length;
-  if(nInc){
-    h += '<div class="encours incmenu"><span><b>Paramétrage incomplet</b> — ' + nInc + ' incohérence' + (nInc>1?'s':'')
-      + ' entre la Matrice, les gammes et les valeurs TS.</span><span class="sp"></span><button class="btn sm" id="h-incoh">Voir</button></div>';
   }
   h += '<div class="toolbar"><input type="search" id="q" placeholder="Rechercher un article, un lot, un fournisseur…" value="'+esc(window.__q||'')+'">'
      + '<span class="hint" id="q-count">'+list.length+' rapport'+(list.length>1?'s':'')+'</span>'
@@ -1977,7 +2000,7 @@ function ligneTS(art, fam, g, val, rev, dateRev, statut, edit, indiceDef){
     brut:val, vide:vide, na:na,
     mini:(na||vide||isNaN(nom))?null:nom+(isNaN(tm)?0:tm),
     maxi:(na||vide||isNaN(nom))?null:nom+(isNaN(tp)?0:tp),
-    type: na ? 'non applicable' : vide ? 'à renseigner' : (nom===1 && tm===0 && tp===0) ? 'Booléen' : 'Valeur',
+    type: brut === '-' ? 'non applicable' : (vide || isNaN(nom)) ? '' : (nom===1 && tm===0 && tp===0) ? 'Booléen' : 'Valeur',
     typeSpec: String(val[3]===undefined||val[3]===null?'':val[3]).trim(),
     rev:rev, dateRev:dateRev, statut:statut, edit:edit, indiceDef:indiceDef
   };
@@ -2043,7 +2066,7 @@ function psetTS(){
 function tdVal(l, k, colonne){
   var v = l.brut[k];
   v = (v===null||v===undefined) ? '' : v;
-  if(!l.edit) return td(colonne, v, esc(v===''?'—':v), 'bn');
+  if(!l.edit) return td(colonne, v, esc(v), 'bn');
   return '<td data-k="'+colonne+'" data-v="'+esc(v)+'" class="mono"><input data-tsa="'+esc(l.article)+'" data-ts="'+esc(l.id)+'" data-k="'+k+'" data-cell="'+colonne+'" inputmode="decimal" value="'+esc(v)+'"></td>';
 }
 /* Colonne TYPE SPEC : Générale / Individuelle / (vide) — stockée en 4e position du TS (index 3) */
@@ -2065,7 +2088,7 @@ function majBornes(el, val){
   var mini = tr.querySelector('td[data-k="mini"]'), maxi = tr.querySelector('td[data-k="maxi"]'), ty = tr.querySelector('td[data-k="typesaisie"]');
   if(mini){ mini.textContent = ko ? '—' : fmt(nom + (isNaN(tm)?0:tm)); mini.setAttribute('data-v', ko?'':fmt(nom + (isNaN(tm)?0:tm))); }
   if(maxi){ maxi.textContent = ko ? '—' : fmt(nom + (isNaN(tp)?0:tp)); maxi.setAttribute('data-v', ko?'':fmt(nom + (isNaN(tp)?0:tp))); }
-  var t = brut === '-' ? 'non applicable' : brut === '' ? 'à renseigner' : (nom===1 && tm===0 && tp===0) ? 'Booléen' : 'Valeur';
+  var t = brut === '-' ? 'non applicable' : (brut === '' || isNaN(nom)) ? '' : (nom===1 && tm===0 && tp===0) ? 'Booléen' : 'Valeur';
   if(ty){ ty.textContent = t; ty.setAttribute('data-v', t); }
   tr.className = tr.className.replace(/ ?trou| ?napp/g,'') + (brut === '' ? ' trou' : brut === '-' ? ' napp' : '');
 }
@@ -2506,7 +2529,7 @@ function bind(){
   });
 
   if(VIEW === 'rapport') bindRapport();
-  if(VIEW === 'historique') bindHistorique();
+  if(VIEW === 'historique' || VIEW === 'analyse' || VIEW === 'referentiel') bindHistorique();
   if(VIEW === 'analyse') bindAnalyse();
   if(ecranOnglets()) bindParametres();
 
