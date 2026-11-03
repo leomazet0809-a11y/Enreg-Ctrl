@@ -29,7 +29,6 @@
     'b-vider':     'Effacer toutes les mesures saisies dans ce rapport',
     'b-csv':       'Exporter ce rapport dans un fichier CSV',
     'b-print':     'Imprimer le rapport ou l\'enregistrer en PDF',
-    'b-eqf':       'Déclarer un écart qualité fournisseur dans X3',
     'b-rebasculer':'Appliquer à ce rapport la révision de gamme et de valeurs en vigueur',
     'a-reset':     'Effacer tous les filtres de l\'analyse',
     'g-newfam':    'Créer une nouvelle famille de contrôle (gamme)',
