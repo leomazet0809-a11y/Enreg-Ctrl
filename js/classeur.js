@@ -234,7 +234,7 @@ function feuille(rows){
 }
 function tableauRapports(){
   var rows = [['Date','Article','Lot','Commande','Fournisseur','Contrôleur','Origine','Qté commandée','Qté réceptionnée','Qté échantillon',
-    'Conformes','Non conformes','Durée contrôle','Décision','Type NC','Sous-type NC','Gamme','Rév. gamme','Rév. valeurs','Indice de définition','Commentaires','Identifiant']];
+    'Conformes','Non conformes','Durée contrôle','Décision','Type NC','Sous-type NC','Gamme','Rév. gamme','Rév. valeurs','Commentaires','Identifiant']];
   REPORTS.slice().sort(function(a,b){ return String(b.date||'') < String(a.date||'') ? -1 : String(b.date||'') > String(a.date||'') ? 1 : 0; })
     .forEach(function(r){
       var t = totaux2(r);
@@ -242,7 +242,7 @@ function tableauRapports(){
         nombreOuTexte(r.qteCommandee), nombreOuTexte(r.qteReceptionnee), nombreOuTexte(r.qteEchantillon),
         t.conforme, t.nonConforme, r.dureeControle, libDecision(r.decision), r.typeNC||'', r.sousTypeNC||'',
         r.famille||'', r.gamRev===null||r.gamRev===undefined?'':r.gamRev, r.tsRev===null||r.tsRev===undefined?'':r.tsRev,
-        r.indiceDef||'', r.commentaires||'', r.id]);
+        r.commentaires||'', r.id]);
     });
   return rows;
 }
