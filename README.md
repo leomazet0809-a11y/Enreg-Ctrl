@@ -62,7 +62,7 @@ Les onglets **GAMSERIE**, **TS** et **Matrice** se modifient directement dans Ex
 
 Bon à savoir :
 
-- Une gamme (GAMSERIE) ou des valeurs (TS) modifiées dans Excel ouvrent une **révision en brouillon** : validez-la dans *Paramètres → GAMSERIE / TS* pour qu'elle serve aux nouveaux rapports.
+- Une gamme (GAMSERIE) ou des valeurs (TS) modifiées dans Excel ouvrent une **révision en brouillon** : validez-la dans *Référentiel → GAMSERIE / TS* pour qu'elle serve aux nouveaux rapports.
 - Dans TS, modifiez **Nominal**, **Tol -**, **Tol +** et **Type spéc.** (Générale / Individuelle). Un point est relié à la gamme uniquement par sa **Famille** et son **Code** (la spécification, le moyen et la méthode sont dans GAMSERIE). Les colonnes Mini., Maxi., Type saisie, Révision, Date et Statut sont recalculées par l'application.
 - Les onglets **Rapports**, **Mesures** et **Journal** sont en lecture seule : les rapports se saisissent dans l'application.
 - Si vous avez aussi des modifications non enregistrées dans l'application, elle vous demande quoi faire : *Intégrer les modifications Excel* (vos rapports en cours sont conservés) ou *Garder la version de l'application*.
@@ -72,9 +72,9 @@ Bon à savoir :
 
 Tous les articles d'une famille suivent la même gamme (points de contrôle, moyens et méthodes) ; seules les valeurs changent d'un article à l'autre, dans TS.
 
-- **Créer un article** (*Paramètres → TS* ou *Matrice → Ajouter un article*) : indiquez sa référence, son fournisseur et sa famille. Ses lignes TS sont préparées automatiquement à partir de la gamme de la famille, avec le type de spécification habituel de la famille : il ne reste qu'à saisir les valeurs. Vous pouvez aussi partir des valeurs d'un article existant de la même famille.
+- **Créer un article** (*Référentiel → TS* ou *Référentiel → Matrice*, bouton *Ajouter un article*) : indiquez sa référence, son fournisseur et sa famille. Ses lignes TS sont préparées automatiquement à partir de la gamme de la famille, avec le type de spécification habituel de la famille : il ne reste qu'à saisir les valeurs. Vous pouvez aussi partir des valeurs d'un article existant de la même famille.
 - Changer la famille d'un article dans la Matrice (article en révision brouillon) prépare de la même façon les points manquants.
-- **Paramètres → Cohérence** liste ce qui empêche un article d'avoir un rapport complet, avec un bouton pour corriger :
+- **Référentiel → Cohérence** liste ce qui empêche un article d'avoir un rapport complet, avec un bouton pour corriger :
   - article sans famille, ou famille absente de GAMSERIE ;
   - point de la gamme sans valeur dans TS (saisissez « - » si le point ne s'applique pas à l'article) ;
   - valeur TS sur un code qui n'existe pas dans la gamme de la famille.
@@ -94,16 +94,18 @@ Ce qui se passe à chaque enregistrement :
 - Quand vous revenez dans l'application (changement de fenêtre ou d'onglet), elle relit aussi le classeur et affiche les rapports enregistrés entre-temps par les autres.
 - Le rapport en cours de saisie (non encore complet) reste propre à chaque PC.
 
-Conseil : confiez la modification des gammes et des valeurs (Paramètres, ou onglets Excel) à une seule personne, et laissez les contrôleurs saisir les rapports.
+Conseil : confiez la modification des gammes et des valeurs (Référentiel, ou onglets Excel) à une seule personne, et laissez les contrôleurs saisir les rapports.
 
 ## Navigation
 
 - L'écran principal est la liste des **Rapports enregistrés** : cliquez sur un rapport pour l'ouvrir.
 - Le bouton **Nouveau rapport** (document +) est à droite du titre « Rapports enregistrés » : un nouveau rapport s'ouvre uniquement depuis cet écran. Sa **Date** est la date d'ouverture du rapport, renseignée automatiquement (non modifiable).
-- Le ruban en haut regroupe, sur tous les écrans, les icônes **Analyses des dérives** (courbe), **Paramètres** (roue crantée), **Enregistrer** (disquette) et mode clair / sombre. Depuis un rapport, les mêmes vérifications qu'à sa fermeture s'appliquent.
+- **Référentiel** : GAMSERIE, TS, Matrice, Cohérence, Révisions et Documents. Une pastille orange sur son icône indique le nombre d'incohérences.
+- **Paramètres** : Sauvegarde (classeur, travail à plusieurs, copies) et Affichage (mode clair / sombre, taille du texte).
+- Le ruban en haut regroupe, sur tous les écrans, les icônes **Analyses des dérives** (courbe), **Référentiel** (livre), **Paramètres** (roue crantée), **Enregistrer** (disquette). Depuis un rapport, les mêmes vérifications qu'à sa fermeture s'appliquent.
 - Dans un rapport, une pastille rouge indique le nombre de pièces non conformes à droite de chaque spécification, et le nombre de spécifications non conformes à côté du numéro de chaque pièce.
 - Les valeurs relevées s'écrivent avec une virgule : un point saisi est remplacé par une virgule dès que la cellule est validée.
-- La croix en haut à droite des écrans Rapport, Analyses et Paramètres ramène à la liste.
+- La croix en haut à droite des écrans Rapport, Analyses, Référentiel et Paramètres ramène à la liste.
 - Un rapport commencé mais incomplet (article, lot ou quantité échantillon manquant) apparaît dans un bandeau « Rapport en cours » avec un bouton **Reprendre**.
 - Chaque bouton affiche une info-bulle qui précise son action après une seconde de survol.
 - L'affichage s'adapte à la taille de l'écran (grand écran, portable, tablette, téléphone).
@@ -114,7 +116,7 @@ Conseil : confiez la modification des gammes et des valeurs (Paramètres, ou ong
 
 ## Mode clair / sombre
 
-Le bouton lune / soleil en haut à droite bascule entre le mode clair et le mode sombre. Le choix est mémorisé sur le poste.
+*Paramètres → Affichage* : choisissez **Clair** ou **Sombre**. Le choix est mémorisé sur le poste ; au premier lancement, l'application suit le réglage de Windows.
 
 ## Mettre en ligne (facultatif)
 

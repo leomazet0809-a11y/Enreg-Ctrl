@@ -581,3 +581,14 @@ table.flat.inc td.act3 .btn + .btn{margin-left:6px}
   font-family:var(--body);font-size:12.5px;line-height:1.4;box-shadow:var(--shadow-lg);pointer-events:none;opacity:0;visibility:hidden;transition:opacity .12s}
 .infobulle.vis{opacity:1;visibility:visible}
 @media print{.infobulle{display:none}}
+
+/* --- Référentiel : pastille du nombre d'incohérences sur l'icône du ruban --- */
+#h-referentiel{position:relative}
+.pastille-inc{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--amber);color:#fff;
+  font-size:10.5px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px var(--paper)}
+
+/* --- Paramètres → Affichage : choix clair / sombre --- */
+.segment{display:inline-flex;border:1px solid var(--rule);border-radius:9px;padding:3px;background:var(--field);gap:3px;margin:6px 0 4px}
+.segment button{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border:0;border-radius:7px;background:transparent;color:var(--ink2);font:inherit;font-weight:500;cursor:pointer}
+.segment button:hover{color:var(--ink)}
+.segment button[aria-checked="true"]{background:var(--paper);color:var(--accent);box-shadow:var(--shadow)}

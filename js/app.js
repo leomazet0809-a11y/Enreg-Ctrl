@@ -27,7 +27,15 @@ var VTYPE = 'gam';         // écran Révisions : type affiché
 var VCLE = '';             // écran Révisions : clé affichée
 var R = null;              // rapport courant
 var VIEW = 'rapport';
-var PSET = 'gamserie';     // onglet paramètres actif
+var PSET = 'gamserie';     // onglet actif de l'écran Référentiel ou Paramètres
+/* Onglets de chaque écran ; le dernier onglet ouvert de chaque écran est retenu */
+var ONGLETS = {
+  referentiel:[['gamserie','GAMSERIE — gammes de contrôle'],['ts','TS — valeurs par article'],['matrice','Matrice — article / fournisseur'],
+               ['coherence','Cohérence'],['revisions','Révisions'],['documents','Documents']],
+  parametres:[['sauvegarde','Sauvegarde'],['affichage','Affichage']]
+};
+var ONGLET_MEMO = {referentiel:'gamserie', parametres:'sauvegarde'};
+function ecranOnglets(){ return VIEW === 'referentiel' || VIEW === 'parametres'; }
 var TSVUE = '';            // tableau TS : '' | 'trous'
 var FGAM = {}, FTS = {};   // filtres saisis dans les en-têtes de colonnes
 var GARCH = false, TARCH = false;  // affichage des révisions archivées
@@ -1203,10 +1211,21 @@ function totaux2(rep){ var s = R; R = rep; var t = totaux(); R = s; return t; }
 function render(){
   document.querySelectorAll('.nav button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.view === VIEW ? 'true' : 'false'); });
   majBarreFichier();
-  ['analyse','parametres'].forEach(function(v){
+  ['analyse','referentiel','parametres'].forEach(function(v){
     var bt = document.getElementById('h-' + v);
     if(bt) bt.setAttribute('aria-current', VIEW === v ? 'true' : 'false');
   });
+  var nInc = incoherences().length, pi = document.getElementById('h-referentiel');
+  if(pi){
+    var pa = pi.querySelector('.pastille-inc');
+    if(nInc){ if(!pa){ pa = document.createElement('span'); pa.className = 'pastille-inc'; pi.appendChild(pa); } pa.textContent = nInc; }
+    else if(pa) pa.remove();
+  }
+  if(ecranOnglets()){
+    var ok = ONGLETS[VIEW].some(function(o){ return o[0] === PSET; });
+    if(!ok) PSET = ONGLET_MEMO[VIEW];
+    ONGLET_MEMO[VIEW] = PSET;
+  }
   var m = document.getElementById('main');
   if(VIEW === 'rapport') m.innerHTML = viewRapport();
   else if(VIEW === 'historique') m.innerHTML = viewHistorique();
@@ -1266,7 +1285,7 @@ function viewRapport(){
 
   if(!R.article){
     h += '<div class="empty"><b>Aucun article renseigné</b>Choisissez un article : les spécifications de sa famille et les valeurs attendues se déclinent automatiquement.'
-      + (arts.length ? '' : '<br><br>Aucune base chargée. Rendez-vous dans <b style="display:inline">Paramètres</b> pour importer GAMSERIE, TS et Matrice.') + '</div>';
+      + (arts.length ? '' : '<br><br>Aucune base chargée. Rendez-vous dans <b style="display:inline">Référentiel</b> pour importer GAMSERIE, TS et Matrice.') + '</div>';
   } else if(!R.lignes.length){
     h += '<div class="empty"><b>Pas de gamme pour cet article</b>'
       + (fam ? 'Famille « '+esc(fam)+' » : aucune spécification dans GAMSERIE.' : 'Article absent de la Matrice : aucune famille associée.')
@@ -1350,7 +1369,7 @@ function viewRapport(){
     }
 
     if(!gens.length && !hasIndiv){
-      h += '<div class="empty"><b>Aucun point à relever</b>Renseignez la colonne <b style="display:inline">TYPE SPEC</b> (Générale ou Individuelle) dans <b style="display:inline">Paramètres → TS</b> : les points « Générale » se relèvent une fois au-dessus du tableau, les points « Individuelle » pièce par pièce.</div>';
+      h += '<div class="empty"><b>Aucun point à relever</b>Renseignez la colonne <b style="display:inline">TYPE SPEC</b> (Générale ou Individuelle) dans <b style="display:inline">Référentiel → TS</b> : les points « Générale » se relèvent une fois au-dessus du tableau, les points « Individuelle » pièce par pièce.</div>';
     }
   }
 
@@ -1403,7 +1422,7 @@ function bandeauRevision(){
   var alertes = [];
   if(R.gamStatut === 'brouillon') alertes.push('La gamme « ' + esc(R.famille) + ' » est en <b>brouillon de révision ' + R.gamRev + '</b>, non validée.');
   if(R.tsStatut === 'brouillon') alertes.push('Les valeurs de <b>' + esc(R.article) + '</b> sont en <b>brouillon de révision ' + R.tsRev + '</b>, non validées.');
-  if(R.gamStatut === 'sans révision' || R.tsStatut === 'sans révision') alertes.push('Données sans révision enregistrée : validez-les dans Paramètres → Révisions.');
+  if(R.gamStatut === 'sans révision' || R.tsStatut === 'sans révision') alertes.push('Données sans révision enregistrée : validez-les dans Référentiel → Révisions.');
   var chgGam = vg && R.gamRev !== null && (vg.rev !== R.gamRev || (R.gamStatut === 'brouillon' && vg.statut === 'applicable'));
   var chgTs = vt && R.tsRev !== null && (vt.rev !== R.tsRev || (R.tsStatut === 'brouillon' && vt.statut === 'applicable'));
   var perime = chgGam || chgTs;
@@ -1620,21 +1639,21 @@ function bindAnalyse(){
 
 /* ---------- vue paramètres ---------- */
 function viewParametres(){
-  var nInc = incoherences().length;
+  var nInc = incoherences().length, ref = VIEW === 'referentiel';
+  var titre = ref ? 'Référentiel' : 'Paramètres';
   var h = '<div class="sheet">'
-    + '<div class="rbar"><b>Paramètres</b>'
-    + '<button class="close noprint" id="p-fermer" title="Fermer les paramètres et revenir aux rapports enregistrés" aria-label="Fermer les paramètres">'
+    + '<div class="rbar"><b>' + titre + '</b>'
+    + '<button class="close noprint" id="p-fermer" title="Fermer et revenir aux rapports enregistrés" aria-label="Fermer ' + (ref ? 'le référentiel' : 'les paramètres') + '">'
     + '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>'
     + '</button></div>'
     + '<div class="tabs">'
-    + '<button data-pset="gamserie" aria-current="'+(PSET==='gamserie')+'">GAMSERIE — gammes de contrôle</button>'
-    + '<button data-pset="ts" aria-current="'+(PSET==='ts')+'">TS — valeurs par article</button>'
-    + '<button data-pset="matrice" aria-current="'+(PSET==='matrice')+'">Matrice — article / fournisseur</button>'
-    + '<button data-pset="coherence" aria-current="'+(PSET==='coherence')+'">Cohérence' + (nInc ? ' <span class="nbinc">'+nInc+'</span>' : '') + '</button>'
-    + '<button data-pset="revisions" aria-current="'+(PSET==='revisions')+'">Révisions</button>'
-    + '<button data-pset="documents" aria-current="'+(PSET==='documents')+'">Documents ('+DOCS.length+')</button>'
-    + '<button data-pset="sauvegarde" aria-current="'+(PSET==='sauvegarde')+'">Sauvegarde</button>'
-    + '<button data-pset="affichage" aria-current="'+(PSET==='affichage')+'">Affichage</button>'
+    + ONGLETS[VIEW].map(function(o){
+        var lib = o[1];
+        if(o[0] === 'coherence' && nInc) lib += ' <span class="nbinc">' + nInc + '</span>';
+        else if(o[0] === 'documents') lib += ' (' + DOCS.length + ')';
+        else lib = esc(lib);
+        return '<button data-pset="' + o[0] + '" aria-current="' + (PSET === o[0]) + '">' + lib + '</button>';
+      }).join('')
     + '</div><div class="pad">';
   if(PSET === 'gamserie') h += psetGamserie();
   else if(PSET === 'ts') h += psetTS();
@@ -2068,8 +2087,14 @@ function changerTaille(sens){
   render();
 }
 function psetAffichage(){
-  var z = tailleTexte();
-  return '<h3 style="margin:0 0 4px;font-size:14px;font-weight:600">Taille du texte</h3>'
+  var z = tailleTexte(), th = themeCourant();
+  return '<h3 style="margin:0 0 4px;font-size:14px;font-weight:600">Mode d\'affichage</h3>'
+    + '<p class="hint" style="margin:0 0 8px">Couleurs claires ou sombres. Le réglage est mémorisé sur ce poste.</p>'
+    + '<div class="segment" role="radiogroup" aria-label="Mode d\'affichage">'
+    + '<button id="th-light" role="radio" aria-checked="'+(th==='light')+'" title="Afficher l\'application en mode clair">' + ICONES.sun + '<span>Clair</span></button>'
+    + '<button id="th-dark" role="radio" aria-checked="'+(th==='dark')+'" title="Afficher l\'application en mode sombre">' + ICONES.moon + '<span>Sombre</span></button>'
+    + '</div>'
+    + '<h3 style="margin:22px 0 4px;font-size:14px;font-weight:600">Taille du texte</h3>'
     + '<p class="hint" style="margin:0 0 8px">Agrandit ou réduit tout l\'affichage de l\'application. Le réglage est mémorisé sur ce poste.</p>'
     + '<div class="taille">'
     + '<button class="btn" id="t-moins" title="Réduire" aria-label="Réduire la taille du texte"'+(z <= TAILLES[0] + 0.001 ? ' disabled' : '')+'>A−</button>'
@@ -2361,7 +2386,7 @@ function bind(){
   if(VIEW === 'rapport') bindRapport();
   if(VIEW === 'historique') bindHistorique();
   if(VIEW === 'analyse') bindAnalyse();
-  if(VIEW === 'parametres') bindParametres();
+  if(ecranOnglets()) bindParametres();
 
   setupColResize();
 }
@@ -2765,6 +2790,8 @@ function allerVers(v){
   var a = document.getElementById('h-analyse'), p = document.getElementById('h-parametres');
   if(a) a.onclick = function(){ allerVers('analyse'); };
   if(p) p.onclick = function(){ allerVers('parametres'); };
+  var rf = document.getElementById('h-referentiel');
+  if(rf) rf.onclick = function(){ allerVers('referentiel'); };
 })();
 
 function bindHistorique(){
@@ -2777,7 +2804,7 @@ function bindHistorique(){
     R = newReport(); saveDraft(); VIEW = 'rapport'; render();
   };
   var b;
-  if(b = document.getElementById('h-incoh')) b.onclick = function(){ VIEW = 'parametres'; PSET = 'coherence'; render(); };
+  if(b = document.getElementById('h-incoh')) b.onclick = function(){ VIEW = 'referentiel'; PSET = 'coherence'; render(); };
   if(b = document.getElementById('h-reprendre')) b.onclick = function(){ VIEW = 'rapport'; render(); };
   if(b = document.getElementById('h-abandon')) b.onclick = function(){
     if(!confirm('Abandonner le rapport en cours ? Les saisies seront perdues.')) return;
@@ -2910,6 +2937,8 @@ function bindParametres(){
   if(b = document.getElementById('t-moins')) b.onclick = function(){ changerTaille(-1); };
   if(b = document.getElementById('t-plus')) b.onclick = function(){ changerTaille(1); };
   if(b = document.getElementById('t-reset')) b.onclick = function(){ changerTaille(0); };
+  if(b = document.getElementById('th-light')) b.onclick = function(){ appliquerTheme('light'); render(); };
+  if(b = document.getElementById('th-dark')) b.onclick = function(){ appliquerTheme('dark'); render(); };
 
   document.querySelectorAll('[data-incfam]').forEach(function(x){ x.onclick = function(){ choisirFamille(x.dataset.incfam); }; });
   document.querySelectorAll('[data-incts]').forEach(function(x){
