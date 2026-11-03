@@ -167,12 +167,14 @@ function sansColonne(rows, nom){
 function integrerFeuillesExcel(wb, tout){
   var bilan = {bases:[], revisions:0, ignores:[], erreurs:[]};
   /* les tableaux de référence sont calculés avant toute intégration (TS dépend de la matrice et de GAMSERIE) */
-  var refs = FEUILLES_EDITABLES.map(function(f){ return wb.Sheets[f.feuille] ? empreinte(lignesFeuille(feuille(f.tableau()))) : null; });
+  var refs = FEUILLES_EDITABLES.map(function(f){ return wb.Sheets[f.feuille] ? lignesFeuille(feuille(f.tableau())) : null; });
   FEUILLES_EDITABLES.forEach(function(f, i){
     var ws = wb.Sheets[f.feuille]; if(!ws) return;
-    var rows = lignesFeuille(ws);
+    var rows = lignesFeuille(ws), ref = refs[i];
     if(f.base === 'ts') rows = sansColonne(rows, 'specification');   // ancienne colonne informative de TS
-    if(!tout && empreinte(rows) === refs[i]) return;
+    /* classeur antérieur aux identifiants de points : pas de colonne ID dans l'onglet */
+    if(rows.length && sansColonne(rows.slice(0, 1), 'id')[0].length === rows[0].length) ref = sansColonne(ref, 'id');
+    if(!tout && empreinte(rows) === empreinte(ref)) return;
     if(rows.length < 2){ bilan.ignores.push(f.feuille); return; }   // onglet vidé : on ne remplace pas la base par du vide
     try{
       bilan.revisions += importerTableau(f.base, rows, 'remplacer', 'Modifié dans Excel');
@@ -307,8 +309,8 @@ function feuilleModeEmploi(){
     ['Enregistrements Contrôles — mode d\'emploi du classeur'],
     [''],
     ['Onglet', 'Modifiable dans Excel', 'Contenu'],
-    ['GAMSERIE', 'Oui', 'Gammes de contrôle : une ligne par famille + code (Famille Méthode, Code, Criticité, Spécification, Moyen, Méthode).'],
-    ['TS', 'Oui', 'Valeurs par article : une ligne par article + code (Nominal, Tol -, Tol +, Type spéc. = Générale / Individuelle). Mini et Maxi sont recalculés.'],
+    ['GAMSERIE', 'Oui', 'Gammes de contrôle : une ligne par point de contrôle (ID, Famille Méthode, Code, Criticité, Spécification, Moyen, Méthode). L\'ID identifie le point : ne le modifiez pas ; une ligne ajoutée sans ID en reçoit un. Le code peut être vide ou en double.'],
+    ['TS', 'Oui', 'Valeurs par article : une ligne par article + point (ID du point de la gamme, Nominal, Tol -, Tol +, Type spéc. = Générale / Individuelle). Sans ID, le point est retrouvé par son code s\'il est unique dans la famille. Mini et Maxi sont recalculés.'],
     ['Matrice', 'Oui', 'Article, code fournisseur, famille, matière, liasse et références documentaires.'],
     ['Rapports', 'Non', 'Liste des rapports enregistrés (saisie dans l\'application).'],
     ['Mesures', 'Non', 'Toutes les valeurs relevées.'],
@@ -468,8 +470,9 @@ function appliquerDonnees(lu, handle, nom){
   }finally{
     CHARGEMENT = false;
   }
-  /* des données reprises d'Excel ne sont pas encore dans l'onglet _Donnees : à enregistrer */
-  CLASSEUR.modifie = !!(bilan && bilan.bases.length);
+  /* des données reprises d'Excel (ou les identifiants de points ajoutés) ne sont pas encore dans le classeur : à enregistrer */
+  CLASSEUR.modifie = !!(bilan && bilan.bases.length) || (!!lu && IDS_MIGRES);
+  IDS_MIGRES = false;
   fermerAccueil();
   render();
   majBarreFichier();

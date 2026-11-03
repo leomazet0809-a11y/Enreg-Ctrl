@@ -54,6 +54,7 @@ function loadAll(){
   if(dr === null && get('rc.draft') !== null){ dr = get('rc.draft'); }
   delete MEM['rc.draft'];
   R = dr ? JSON.parse(dr) : newReport();
+  migrerIds();   // anciennes données sans identifiant de point : reprise automatique
 }
 function saveDB(){ put('rc.db', JSON.stringify(DB)); }
 function saveReports(){ put('rc.reports', JSON.stringify(REPORTS)); }
@@ -169,6 +170,111 @@ function familles(){
   return out.sort();
 }
 
+/* =======================================================================
+   Identifiant unique des points de contrôle (lignes GAMSERIE)
+   Le code (A, B, C…) n'est qu'une étiquette : il peut être vide, « N/A »,
+   en double ou changer d'une révision à l'autre. Le lien gamme -> TS ->
+   rapports -> analyses se fait par l'identifiant, qui ne change jamais.
+   ======================================================================= */
+var ALPHA_ID = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function hacher(s){ var h = 2166136261; for(var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h; }
+function idsExistants(){ var p = {}; DB.gamserie.forEach(function(g){ if(g.id) p[g.id] = 1; }); return p; }
+/* Nouvel identifiant de 6 caractères, unique ; graine = identifiant reproductible
+   (la reprise des données existantes donne les mêmes identifiants sur tous les postes) */
+function nouvelId(pris, graine){
+  pris = pris || idsExistants();
+  for(var essai=0;;essai++){
+    var id = '', x = graine !== undefined ? hacher(graine + '#' + essai) : 0;
+    for(var i=0;i<6;i++){
+      var k = graine !== undefined ? x % 32 : Math.floor(Math.random() * 32);
+      if(graine !== undefined) x = Math.floor(x / 32) + (i === 4 ? hacher(graine + '~' + essai) : 0);
+      id += ALPHA_ID[k];
+    }
+    if(!pris[id]){ pris[id] = 1; return id; }
+  }
+}
+/* Clé d'une ligne de rapport (anciens rapports sans identifiant : le code) */
+function cleL(l){ return (l && (l.id || l.code)) || ''; }
+/* Étiquette d'un point : son code, sinon le début de la spécification */
+function libPoint(l){
+  var c = String(l && l.code || '').trim();
+  if(c) return c;
+  var sp = String(l && (l.specification || l.spec) || '').trim();
+  return sp ? (sp.length > 24 ? sp.slice(0, 23) + '…' : sp) : '—';
+}
+function memeCode(a, b){ return String(a||'').trim().toUpperCase() === String(b||'').trim().toUpperCase(); }
+/* Lignes de la gamme d'une famille portant ce code */
+function lignesDuCode(fam, code){ return DB.gamserie.filter(function(g){ return g.famille === fam && memeCode(g.code, code); }); }
+function ligneGamParId(id){ for(var i=0;i<DB.gamserie.length;i++) if(DB.gamserie[i].id === id) return DB.gamserie[i]; return null; }
+/* Valeurs TS rangées par code (ancien format, import sans colonne ID) -> rangées par identifiant */
+function valsParId(fam, vals, pris){
+  var nv = {}, change = false;
+  for(var c in vals){
+    if(pris[c]){ nv[c] = vals[c]; continue; }
+    var cibles = lignesDuCode(fam, c);
+    if(!cibles.length){ nv[c] = vals[c]; continue; }          // hors gamme : conservé tel quel
+    cibles.forEach(function(g){ if(!nv[g.id]) nv[g.id] = clone(vals[c]); });
+    change = true;
+  }
+  return change ? nv : null;
+}
+/* Associe des lignes (rapport, photo de révision) sans identifiant aux lignes de la gamme
+   actuelle de même code, dans l'ordre ; à défaut, identifiant reproductible. */
+function attribuerIds(lignes, fam, graine, pris){
+  var utilises = {}, n = 0;
+  lignes.forEach(function(l, i){
+    if(l.id) return;
+    var g = lignesDuCode(fam, l.code).filter(function(x){ return !utilises[x.id]; })[0];
+    if(g){ l.id = g.id; utilises[g.id] = 1; }
+    else l.id = nouvelId(pris, graine + '|' + (l.code||'') + '|' + i);
+    n++;
+  });
+  return n;
+}
+/* Reprise unique : ajoute les identifiants aux gammes, et range TS, révisions et rapports par identifiant */
+var IDS_MIGRES = false;
+function migrerIds(){
+  var pris = idsExistants(), nG = 0, nT = 0, nH = 0, nR = 0, rang = {};
+  DB.gamserie.forEach(function(g){
+    var k = g.famille + '|' + String(g.code||'').trim().toUpperCase(); rang[k] = (rang[k] || 0) + 1;
+    if(!g.id){ g.id = nouvelId(pris, 'gam|' + k + '|' + rang[k]); nG++; }
+  });
+  DB.ts.forEach(function(t){
+    var nv = t.vals ? valsParId(familleOf(t.article), t.vals, pris) : null;
+    if(nv){ t.vals = nv; nT++; }
+  });
+  HIST.forEach(function(h){
+    if(h.type === 'gam' && Array.isArray(h.photo) && h.photo.some(function(l){ return !l.id; })) nH += attribuerIds(h.photo, h.cle, 'hist|' + h.cle + '|' + h.rev, pris);
+    else if(h.type === 'ts' && h.photo && !Array.isArray(h.photo)){
+      var nv = valsParId(familleOf(h.cle), h.photo, pris); if(nv){ h.photo = nv; nH++; }
+    }
+  });
+  function rapport(rep){
+    if(!rep || !rep.lignes || !rep.lignes.some(function(l){ return !l.id; })) return 0;
+    var fam = rep.famille || familleOf(rep.article), codes = rep.lignes.map(function(l){ return l.code; });
+    attribuerIds(rep.lignes, fam, 'rap|' + rep.id, pris);
+    ['generales','moyens'].forEach(function(champ){
+      var o = rep[champ]; if(!o) return;
+      var nv = {};
+      rep.lignes.forEach(function(l, i){ if(o[codes[i]] !== undefined) nv[l.id] = o[codes[i]]; });
+      for(var k in o) if(pris[k]) nv[k] = o[k];
+      rep[champ] = nv;
+    });
+    if(rep.chartCote && rep.chartCote !== '__all'){
+      var i = codes.indexOf(rep.chartCote); if(i > -1) rep.chartCote = rep.lignes[i].id;
+    }
+    return 1;
+  }
+  REPORTS.forEach(function(r){ nR += rapport(r); });
+  var nD = rapport(R);
+  if(nG || nT) saveDB();
+  if(nH) saveHist();
+  if(nR) saveReports();
+  if(nD) saveDraft();
+  if(nG || nT || nH || nR) IDS_MIGRES = true;
+  return nG + nT + nH + nR;
+}
+
 /* Construit les lignes du rapport : GAMSERIE (spécifications de la famille)
    + TS (nominal / tol - / tol +)  ->  Mini = nom+tol-, Maxi = nom+tol+     */
 function buildLignes(article){
@@ -177,14 +283,14 @@ function buildLignes(article){
   var out = [];
   DB.gamserie.forEach(function(g){
     if(g.famille !== fam) return;
-    var v = (ts && ts.vals && ts.vals[g.code]) ? ts.vals[g.code] : null;
+    var v = (ts && ts.vals && ts.vals[g.id]) ? ts.vals[g.id] : null;
     var brut = v ? v[0] : null;
     var nom = num(brut), tm = num(v?v[1]:null), tp = num(v?v[2]:null);
     if(isNaN(tm)) tm = 0;
     if(isNaN(tp)) tp = 0;
     var na = !v || String(brut===null||brut===undefined?'':brut).trim()==='-' || isNaN(nom);
     var l = {
-      code:g.code, specification:g.specification, criticite:g.criticite||'',
+      id:g.id, code:g.code, specification:g.specification, criticite:g.criticite||'',
       outil:g.moyen||'', methode:g.methode||'', na:na,
       typeSpec: v ? String(v[3]===undefined||v[3]===null?'':v[3]).trim() : ''  // Générale / Individuelle / (vide)
     };
@@ -214,14 +320,14 @@ function aIndividuelles(){ return R.lignes.some(function(l){ return specKind(l) 
    ======================================================================= */
 /* Points de contrôle (avec un code) de la gamme d'une famille, dans l'ordre */
 function gammeDe(fam){
-  return DB.gamserie.filter(function(g){ return g.famille === fam && String(g.code||'').trim() !== ''; });
+  return DB.gamserie.filter(function(g){ return g.famille === fam && g.id; });
 }
 /* Type de spécification le plus utilisé pour ce point par les autres articles de la famille */
-function typeSpecUsuel(fam, code, sauf){
+function typeSpecUsuel(fam, id, sauf){
   var n = {}, best = '', max = 0;
   DB.matrice.forEach(function(m){
     if(m.famille !== fam || m.article === sauf) return;
-    var t = tsOf(m.article), v = t && t.vals ? t.vals[code] : null;
+    var t = tsOf(m.article), v = t && t.vals ? t.vals[id] : null;
     var ty = v ? String(v[3]===undefined||v[3]===null?'':v[3]).trim() : '';
     if(ty) n[ty] = (n[ty]||0) + 1;
   });
@@ -239,11 +345,11 @@ function preparerTS(article, modele){
   if(!t.vals) t.vals = {};
   var src = modele ? tsOf(modele) : null, n = 0;
   gammeDe(fam).forEach(function(g){
-    var v = t.vals[g.code];
+    var v = t.vals[g.id];
     if(v && String(v[0]===null||v[0]===undefined?'':v[0]).trim() !== '') return;  // déjà renseigné
-    var s = src && src.vals ? src.vals[g.code] : null;
-    if(s) t.vals[g.code] = clone(s);
-    else if(!v) t.vals[g.code] = ['', '', '', typeSpecUsuel(fam, g.code, article)];
+    var s = src && src.vals ? src.vals[g.id] : null;
+    if(s) t.vals[g.id] = clone(s);
+    else if(!v) t.vals[g.id] = ['', '', '', typeSpecUsuel(fam, g.id, article)];
     else return;
     n++;
   });
@@ -262,8 +368,8 @@ function valeurTSVide(v){
 function incoherences(){
   var gam = {}, out = [];
   DB.gamserie.forEach(function(g){
-    var c = String(g.code||'').trim(); if(!c) return;
-    (gam[g.famille] = gam[g.famille] || {})[g.code] = 1;
+    if(!g.id) return;
+    (gam[g.famille] = gam[g.famille] || {})[g.id] = 1;
   });
   articles().forEach(function(art){
     if(!String(art||'').trim()) return;
@@ -272,10 +378,10 @@ function incoherences(){
     if(!gam[fam]){ out.push({type:'faminc', article:art, famille:fam, codes:[]}); return; }
     var manque = [], orph = [];
     gammeDe(fam).forEach(function(g){
-      var v = vals[g.code];
-      if(!v || String(v[0]===null||v[0]===undefined?'':v[0]).trim() === '') manque.push(g.code);
+      var v = vals[g.id];
+      if(!v || String(v[0]===null||v[0]===undefined?'':v[0]).trim() === '') manque.push(libPoint(g));
     });
-    for(var c in vals) if(!gam[fam][c] && !valeurTSVide(vals[c])) orph.push(c);
+    for(var c in vals) if(!gam[fam][c] && !valeurTSVide(vals[c])) orph.push(ligneGamParId(c) ? libPoint(ligneGamParId(c)) + ' (autre famille)' : c);
     if(manque.length) out.push({type:'manque', article:art, famille:fam, codes:manque});
     if(orph.length) out.push({type:'orphelin', article:art, famille:fam, codes:orph});
   });
@@ -311,7 +417,7 @@ function casesVides(){
     }
   });
   R.lignes.forEach(function(l){
-    if(specKind(l) === 'generale'){ if(String((R.generales||{})[l.code]||'') === '') v++; }
+    if(specKind(l) === 'generale'){ if(String((R.generales||{})[cleL(l)]||'') === '') v++; }
   });
   return v;
 }
@@ -392,7 +498,7 @@ function serieRapportCote(rep, cote){
   var out = [], n = nbPieces2(rep);
   (rep.lignes||[]).forEach(function(l,i){
     if(specKind(l) !== 'individuelle' || !l.testable || l.qual) return;   // valeurs numériques uniquement
-    if(cote && l.code !== cote) return;
+    if(cote && cleL(l) !== cote) return;
     for(var j=0;j<n;j++){
       var v = num((rep.mesures[i]||[])[j]);
       if(!isNaN(v)) out.push(v);
@@ -404,16 +510,16 @@ function serieRapportCote(rep, cote){
 function chartRapportInner(){
   var cote = R.chartCote || '', spec = null, titre = 'Toutes côtes';
   if(cote && cote !== '__all'){
-    var lg = null; R.lignes.forEach(function(l){ if(l.code === cote) lg = l; });
-    if(lg){ spec = {mini:lg.mini, maxi:lg.maxi, nom:lg.nom}; titre = 'Côte ' + cote; }
+    var lg = null; R.lignes.forEach(function(l){ if(cleL(l) === cote) lg = l; });
+    if(lg){ spec = {mini:lg.mini, maxi:lg.maxi, nom:lg.nom}; titre = 'Côte ' + libPoint(lg); }
   }
   return blocIMR(serieRapportCote(R, cote === '__all' ? '' : cote), spec, titre);
 }
 /* Fenêtre superposée (modale) présentant les deux cartes de contrôle. */
 function ouvrirCarteControle(){
   var old = document.querySelector('.cartemodal'); if(old) old.remove();
-  var cotes = [];
-  R.lignes.forEach(function(l){ if(specKind(l)==='individuelle' && l.testable && !l.qual) cotes.push(l.code); });
+  var cotes = [], libs = {};
+  R.lignes.forEach(function(l){ if(specKind(l)==='individuelle' && l.testable && !l.qual){ cotes.push(cleL(l)); libs[cleL(l)] = libPoint(l) + (l.specification ? ' — ' + l.specification : ''); } });
   if(R.chartCote !== '__all' && cotes.indexOf(R.chartCote) < 0) R.chartCote = cotes[0] || '__all';
   var m = document.createElement('div');
   m.className = 'modal cartemodal';
@@ -421,7 +527,7 @@ function ouvrirCarteControle(){
     + '<div class="cmh"><b>Carte de contrôle — suivi des déviances</b>'
     + '<select id="f-chartcote">'
     + '<option value="__all"'+(R.chartCote==='__all'?' selected':'')+'>Toutes les mesures</option>'
-    + cotes.map(function(c){ return '<option value="'+esc(c)+'"'+(R.chartCote===c?' selected':'')+'>Côte '+esc(c)+'</option>'; }).join('')
+    + cotes.map(function(c){ return '<option value="'+esc(c)+'"'+(R.chartCote===c?' selected':'')+'>Côte '+esc(libs[c])+'</option>'; }).join('')
     + '</select>'
     + '<button class="close" id="cm-close" title="Fermer et revenir au rapport" aria-label="Fermer">'
     + '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>'
@@ -456,7 +562,7 @@ function syncLignes(){
   if(!R.generales) R.generales = {};
   var anciennes = R.lignes || [], anciennesMes = R.mesures || [];
   var index = {};
-  anciennes.forEach(function(l,i){ index[l.code] = anciennesMes[i] || []; });
+  anciennes.forEach(function(l,i){ index[cleL(l)] = anciennesMes[i] || []; });
   R.lignes = R.article ? buildLignes(R.article) : [];
   if(R.article){
     var fam = familleOf(R.article), vg = version('gam', fam), vt = version('ts', R.article);
@@ -471,7 +577,7 @@ function syncLignes(){
   }
   var n = nbPieces();
   R.mesures = R.lignes.map(function(l){
-    var src = index[l.code] || [];
+    var src = index[cleL(l)] || [];
     var row = [];
     for(var j=0;j<n;j++) row.push(src[j] !== undefined ? src[j] : '');
     return row;
@@ -524,7 +630,7 @@ function totauxGen(){
   R.lignes.forEach(function(l){
     if(specKind(l) !== 'generale') return;
     g.total++;
-    var v = String((R.generales||{})[l.code]||'');
+    var v = String((R.generales||{})[cleL(l)]||'');
     if(v === '1') g.ok++; else if(v === '0') g.nc++; else g.reste++;
   });
   return g;
@@ -577,7 +683,7 @@ function journaliser(type, cle, rev, action, detail){
 }
 function photoGam(fam){
   return DB.gamserie.filter(function(g){ return g.famille === fam; }).map(function(g){
-    return {code:g.code, criticite:g.criticite, specification:g.specification, moyen:g.moyen, methode:g.methode};
+    return {id:g.id, code:g.code, criticite:g.criticite, specification:g.specification, moyen:g.moyen, methode:g.methode};
   });
 }
 function photoTS(article){
@@ -745,23 +851,25 @@ function comparer(type, cle, ra, rb){
   if(!a || !b) return out;
   if(type === 'gam'){
     var ma = {}, mb = {};
-    a.forEach(function(l){ ma[l.code] = l; }); b.forEach(function(l){ mb[l.code] = l; });
-    var codes = {}; a.forEach(function(l){ codes[l.code]=1; }); b.forEach(function(l){ codes[l.code]=1; });
-    Object.keys(codes).sort().forEach(function(c){
-      if(!ma[c]) out.push({code:c, type:'ajout', detail:'ajoutée : ' + (mb[c].specification||'')});
-      else if(!mb[c]) out.push({code:c, type:'retrait', detail:'supprimée : ' + (ma[c].specification||'')});
+    var ordre = [];
+    a.forEach(function(l){ var k = cleL(l); ma[k] = l; if(ordre.indexOf(k) < 0) ordre.push(k); });
+    b.forEach(function(l){ var k = cleL(l); mb[k] = l; if(ordre.indexOf(k) < 0) ordre.push(k); });
+    ordre.forEach(function(k){
+      var c = libPoint(mb[k] || ma[k]);
+      if(!ma[k]) out.push({code:c, type:'ajout', detail:'ajoutée : ' + (mb[k].specification||'')});
+      else if(!mb[k]) out.push({code:c, type:'retrait', detail:'supprimée : ' + (ma[k].specification||'')});
       else {
-        ['specification','criticite','moyen','methode'].forEach(function(f){
-          if(String(ma[c][f]||'') !== String(mb[c][f]||''))
-            out.push({code:c, type:'modif', detail:libChamp(f) + ' : « ' + (ma[c][f]||'—') + ' » → « ' + (mb[c][f]||'—') + ' »'});
+        ['code','specification','criticite','moyen','methode'].forEach(function(f){
+          if(String(ma[k][f]||'') !== String(mb[k][f]||''))
+            out.push({code:c, type:'modif', detail:libChamp(f) + ' : « ' + (ma[k][f]||'—') + ' » → « ' + (mb[k][f]||'—') + ' »'});
         });
       }
     });
   } else {
     var codes2 = {};
     for(var k in a) codes2[k]=1; for(var k2 in b) codes2[k2]=1;
-    Object.keys(codes2).sort().forEach(function(c){
-      var va = a[c], vb = b[c];
+    Object.keys(codes2).forEach(function(k){
+      var va = a[k], vb = b[k], g = ligneGamParId(k), c = g ? libPoint(g) : k;
       if(!va) out.push({code:c, type:'ajout', detail:'valeurs ajoutées : ' + trio(vb)});
       else if(!vb) out.push({code:c, type:'retrait', detail:'valeurs supprimées : ' + trio(va)});
       else if(trio(va) !== trio(vb)) out.push({code:c, type:'modif', detail:trio(va) + ' → ' + trio(vb)});
@@ -777,7 +885,7 @@ function trio(v){
     + (ts ? ' / type ' + ts : '');
 }
 function libChamp(f){
-  return {specification:'Spécification', criticite:'Criticité', moyen:'Moyen de contrôle', methode:'Méthode de contrôle'}[f] || f;
+  return {code:'Code', specification:'Spécification', criticite:'Criticité', moyen:'Moyen de contrôle', methode:'Méthode de contrôle'}[f] || f;
 }
 
 
@@ -824,9 +932,9 @@ function parseCSV(text){
 function exportGamserie(){ download('GAMSERIE.csv', toCSV(tableauGamserie())); }
 /* Tableaux à plat réutilisés par les exports CSV et par le classeur Excel */
 function tableauGamserie(){
-  var rows = [['Révision','Date de révision','Statut','Famille Méthode','Code','Criticité','Spécification','Moyen de contrôle','Méthode de contrôle']];
+  var rows = [['ID','Révision','Date de révision','Statut','Famille Méthode','Code','Criticité','Spécification','Moyen de contrôle','Méthode de contrôle']];
   lignesGam(false).forEach(function(l){
-    rows.push([l.rev===null?'':l.rev, l.dateRev?frDate(l.dateRev):'', statutLib(l.statut),
+    rows.push([l.id||'', l.rev===null?'':l.rev, l.dateRev?frDate(l.dateRev):'', statutLib(l.statut),
       l.famille, l.code, l.criticite, l.specification, l.moyen, l.methode]);
   });
   return rows;
@@ -843,20 +951,20 @@ function tableauMatrice(){
   });
   return rows;
 }
+/* Identifiants des points présents dans TS, dans l'ordre des gammes */
 function codesUtilises(){
-  var s = {};
-  DB.gamserie.forEach(function(g){ if(g.code) s[String(g.code).trim()] = 1; });
+  var s = {}, out = [];
   DB.ts.forEach(function(t){ for(var c in t.vals) s[c] = 1; });
-  var out = []; for(var c in s) out.push(c);
-  return out.sort();
+  DB.gamserie.forEach(function(g){ if(s[g.id]){ out.push(g.id); delete s[g.id]; } });
+  return out.concat(Object.keys(s).sort());
 }
 /* Export à plat : une ligne par couple article x point de contrôle */
 function exportTS(){ download('TS.csv', toCSV(tableauTS())); }
 function tableauTS(){
-  var rows = [['Révision','Date de révision','Statut','Indice de définition','Article','Famille','Code',
+  var rows = [['ID','Révision','Date de révision','Statut','Indice de définition','Article','Famille','Code',
                'Type spéc.','Type saisie','Nominal','Tol -','Tol +','Mini.','Maxi.']];
   lignesTS().forEach(function(l){
-    rows.push([l.rev===null?'':l.rev, l.dateRev?frDate(l.dateRev):'', l.statut, l.indiceDef,
+    rows.push([l.id||'', l.rev===null?'':l.rev, l.dateRev?frDate(l.dateRev):'', l.statut, l.indiceDef,
       l.article, l.famille, l.code, l.typeSpec||'', l.type,
       l.brut[0], l.brut[1], l.brut[2],
       l.mini===null?'':l.mini, l.maxi===null?'':l.maxi]);
@@ -909,16 +1017,17 @@ function importerTableau(base, rows, mode, source){
           for(var z=0;z<arguments.length;z++){ var k = nrm.indexOf(arguments[z]); if(k > -1) return k; }
           return -1;
         };
-        var iF = cl('famillemethode','famille'), iC = cl('code'), iCr = cl('criticite'),
+        var iId = cl('id','identifiant'), iF = cl('famillemethode','famille'), iC = cl('code'), iCr = cl('criticite'),
             iS = cl('specification'), iM = cl('moyendecontrole','moyen'), iMe = cl('methodedecontrole','methode');
         if(iF < 0 || iC < 0){ iF = 0; iC = 1; iCr = 2; iS = 3; iM = 4; iMe = 5; }  // ancien format positionnel
         var g = [];
         for(var i=1;i<rows.length;i++){
           var r = rows[i];
-          if(!t(r[iF]) && !t(r[iC])) continue;
-          g.push({famille:t(r[iF]),code:t(r[iC]),criticite:iCr>-1?t(r[iCr]):'',specification:iS>-1?t(r[iS]):'',
+          if(!t(r[iF]) && !t(r[iC]) && !(iS > -1 && t(r[iS]))) continue;
+          g.push({id:iId>-1?t(r[iId]):'', famille:t(r[iF]),code:t(r[iC]),criticite:iCr>-1?t(r[iCr]):'',specification:iS>-1?t(r[iS]):'',
                   moyen:iM>-1?t(r[iM]):'',methode:iMe>-1?t(r[iMe]):''});
         }
+        idsImport(g, mode);
         DB.gamserie = (mode === 'remplacer') ? g : fusionGam(DB.gamserie, g);
       }
       else if(base === 'matrice'){
@@ -953,9 +1062,9 @@ function importerTableau(base, rows, mode, source){
           for(var z=0;z<arguments.length;z++){ var k = norm.indexOf(arguments[z]); if(k > -1) return k; }
           return -1;
         };
-        var cArt = col('article','reference','ref'), cCode = col('code'), cNom = col('nominal','nom','valeur');
-        var ts = [];
-        if(cArt > -1 && cCode > -1 && cNom > -1){
+        var cArt = col('article','reference','ref'), cCode = col('code'), cNom = col('nominal','nom','valeur'), cId = col('id','identifiant');
+        var ts = [], pris = idsExistants();
+        if(cArt > -1 && (cCode > -1 || cId > -1) && cNom > -1){
           /* --- format à plat : une ligne par couple article x code --- */
           var cTm = col('tol-','tolmoins','tolerance-','tolmin'), cTp = col('tol+','tolplus','tolerance+','tolmax');
           var cTy = col('typespec','typespecification'), hasTy = cTy > -1;
@@ -963,18 +1072,20 @@ function importerTableau(base, rows, mode, source){
           var map = {}, ordre = [];
           for(var i3=1;i3<rows.length;i3++){
             var r3 = rows[i3];
-            var art = t(r3[cArt]), code = t(r3[cCode]).toUpperCase();
-            if(!art || !code) continue;
+            var art = t(r3[cArt]), code = cCode > -1 ? t(r3[cCode]) : '', idp = cId > -1 ? t(r3[cId]) : '';
+            if(!art || (!code && !idp)) continue;
             /* en remplacement, une ligne sans aucune valeur = point non renseigné */
             if(mode === 'remplacer' && t(r3[cNom]) === '' && (cTm < 0 || t(r3[cTm]) === '') && (cTp < 0 || t(r3[cTp]) === '') && (!hasTy || t(r3[cTy]) === '')) continue;
+            var fm = cFam > -1 ? t(r3[cFam]) : '';
+            if(fm && !familleOf(art)) DB.matrice.push({article:art, famille:fm});
+            /* le point est désigné par son identifiant ; à défaut, par son code dans la gamme de la famille */
+            var cles = (idp && pris[idp]) ? [idp] : lignesDuCode(familleOf(art) || fm, code).map(function(x){ return x.id; });
+            if(!cles.length) cles = [idp || code.toUpperCase()];
             if(!map[art]){ map[art] = {article:art, vals:{}}; ordre.push(art); }
-            map[art].vals[code] = hasTy
+            var val = hasTy
               ? [conv(t(r3[cNom])), conv(cTm>-1?t(r3[cTm]):''), conv(cTp>-1?t(r3[cTp]):''), t(r3[cTy])]
               : [conv(t(r3[cNom])), conv(cTm>-1?t(r3[cTm]):''), conv(cTp>-1?t(r3[cTp]):'')];
-            if(cFam > -1){
-              var fm = t(r3[cFam]);
-              if(fm && !familleOf(art)) DB.matrice.push({article:art, famille:fm});
-            }
+            cles.forEach(function(k){ map[art].vals[k] = clone(val); });
           }
           ordre.forEach(function(a){ ts.push(map[a]); });
           if(mode !== 'remplacer'){
@@ -992,9 +1103,9 @@ function importerTableau(base, rows, mode, source){
         } else {
           /* --- format large : en-tête = code seul, puis 2 colonnes tol -, tol + --- */
           var idx = [];
-          head.forEach(function(h,k){ if(/^[A-Z]{1,3}$/.test(h)) idx.push([h,k]); });
+          head.forEach(function(h,k){ if(pris[h] || /^[A-Z]{1,3}$/.test(h)) idx.push([h,k]); });
           if(!idx.length){
-            throw new Error('en-tête non reconnu : colonnes Article / Code / Nominal attendues, ou colonnes de code (A, B, C…).');
+            throw new Error('en-tête non reconnu : colonnes Article / ID ou Code / Nominal attendues, ou colonnes d\'identifiant ou de code (A, B, C…).');
           }
           for(var i4=1;i4<rows.length;i4++){
             var r4 = rows[i4];
@@ -1006,7 +1117,7 @@ function importerTableau(base, rows, mode, source){
               if(a === '' && b === '' && cc === '') return;
               vals[c] = [conv(a), conv(b), conv(cc)];
             });
-            ts.push({article:t(r4[0]), vals:vals});
+            ts.push({article:t(r4[0]), vals:valsParId(familleOf(t(r4[0])), vals, pris) || vals});
           }
         }
         DB.ts = (mode === 'remplacer') ? ts : fusionCle(DB.ts, ts, 'article');
@@ -1024,10 +1135,26 @@ function fusionGam(base, ajouts){
   var out = base.slice();
   ajouts.forEach(function(a){
     var f = -1;
-    for(var i=0;i<out.length;i++) if(out[i].famille===a.famille && out[i].code===a.code){ f=i; break; }
+    for(var i=0;i<out.length;i++) if(a.id ? out[i].id === a.id : (out[i].famille===a.famille && out[i].code===a.code)){ f=i; break; }
     if(f>-1) out[f] = a; else out.push(a);
   });
   return out;
+}
+/* Identifiants des lignes GAMSERIE importées : ceux du fichier sont conservés (un doublon,
+   par exemple une ligne copiée dans Excel, reçoit un nouvel identifiant) ; une ligne sans
+   identifiant reprend celui de la ligne existante de même famille et même code, sinon un nouveau. */
+function idsImport(lignes, mode){
+  var vus = {}, existants = idsExistants(), pris = idsExistants();
+  lignes.forEach(function(l){ if(l.id && !vus[l.id]) vus[l.id] = 1; else if(l.id) l.id = ''; });
+  var dispo = DB.gamserie.filter(function(g){ return g.id && !vus[g.id]; });
+  lignes.forEach(function(l){
+    if(l.id){ pris[l.id] = 1; return; }
+    for(var i=0;i<dispo.length;i++){
+      if(dispo[i].famille === l.famille && memeCode(dispo[i].code, l.code)){ l.id = dispo[i].id; dispo.splice(i, 1); return; }
+    }
+    l.id = nouvelId(pris);
+  });
+  return existants;
 }
 function fusionCle(base, ajouts, cle){
   var out = base.slice();
@@ -1159,7 +1286,7 @@ function importJSON(){
       if(!VERS.gam) VERS.gam = {}; if(!VERS.ts) VERS.ts = {};
       blobCache = {};
       saveDB(); saveReports(); saveDocs(); saveVersions(); saveHist(); saveJournal();
-      initVersions(); syncLignes(); saveDraft(); render();
+      migrerIds(); initVersions(); syncLignes(); saveDraft(); render();
       toast('Sauvegarde restaurée.');
     }catch(e){ toast('Restauration impossible : ' + e.message); }
   });
@@ -1184,7 +1311,7 @@ function exportRapport(rep){
     rows.push(['Code','Spécification','Méthode','Résultat']);
     rep.lignes.forEach(function(l){
       if(specKind(l) !== 'generale') return;
-      var v = String(gen[l.code]||'');
+      var v = String(gen[cleL(l)]||'');
       rows.push([l.code, l.specification, l.methode||'', v==='1'?'OK':v==='0'?'NOK':'']);
     });
     rows.push([]);
@@ -1303,14 +1430,14 @@ function viewRapport(){
         + (g.nc?' · <b style="color:var(--nc)">'+g.nc+' NOK</b>':'') + (g.reste?' · '+g.reste+' à renseigner':'') + '</span></div>';
       R.lignes.forEach(function(l){
         if(specKind(l) !== 'generale') return;
-        var v = String((R.generales||{})[l.code]||'');
+        var v = String((R.generales||{})[cleL(l)]||'');
         var cls = v==='1'?'v1':v==='0'?'v0':'';
         h += '<div class="genrow">'
           + '<span class="gencode">'+esc(l.code)+'</span>'
           + '<span class="genspec"><span class="crit '+esc(String(l.criticite).toLowerCase())+'" title="'+esc(l.criticite)+'"></span>'+esc(l.specification)+'</span>'
           + '<span class="genmeth">'+esc(l.methode||'')+'</span>'
-          + '<input class="genmoy" data-moy="'+esc(l.code)+'" value="'+esc((R.moyens||{})[l.code]||'')+'" placeholder="N° moyen" title="Numéro de moyen de contrôle"'+rdo+'>'
-          + '<button class="q genq '+cls+'" data-gen="'+esc(l.code)+'" title="Basculer OK / NOK"'+dis+'>'+(cls==='v1'?'OK':cls==='v0'?'NOK':'–')+'</button>'
+          + '<input class="genmoy" data-moy="'+esc(cleL(l))+'" value="'+esc((R.moyens||{})[cleL(l)]||'')+'" placeholder="N° moyen" title="Numéro de moyen de contrôle"'+rdo+'>'
+          + '<button class="q genq '+cls+'" data-gen="'+esc(cleL(l))+'" title="Basculer OK / NOK"'+dis+'>'+(cls==='v1'?'OK':cls==='v0'?'NOK':'–')+'</button>'
           + '</div>';
       });
       h += '</div>';
@@ -1338,7 +1465,7 @@ function viewRapport(){
         }
         h += '<td class="outil">'+esc(l.outil)+'</td>';
         h += '<td class="meth">'+esc(l.methode)+'</td>';
-        h += '<td class="moy"><input class="cmoy" data-moy="'+esc(l.code)+'" value="'+esc((R.moyens||{})[l.code]||'')+'" title="Numéro de moyen de contrôle"'+rdo+'></td>';
+        h += '<td class="moy"><input class="cmoy" data-moy="'+esc(cleL(l))+'" value="'+esc((R.moyens||{})[cleL(l)]||'')+'" title="Numéro de moyen de contrôle"'+rdo+'></td>';
         for(var k=0;k<n;k++){
           if(!l.testable){ h += '<td class="mes off" data-r="'+i+'" data-c="'+k+'"></td>'; continue; }
           var st = mesureStatut(i,k), v = R.mesures[i][k];
@@ -1360,7 +1487,7 @@ function viewRapport(){
 
       /* --- carte de contrôle type Minitab (I-MR) : ouverte dans une fenêtre superposée --- */
       var cotes = [];
-      R.lignes.forEach(function(l){ if(specKind(l)==='individuelle' && l.testable && !l.qual) cotes.push(l.code); });
+      R.lignes.forEach(function(l){ if(specKind(l)==='individuelle' && l.testable && !l.qual) cotes.push(cleL(l)); });
       if(cotes.length){
         if(R.chartCote !== '__all' && cotes.indexOf(R.chartCote) < 0) R.chartCote = cotes[0];
         h += '<div class="bar noprint" style="border-top:0"><button class="btn pri" id="b-carte">📈 Carte de contrôle — suivi des déviances</button>'
@@ -1543,7 +1670,7 @@ function relevesTous(){
         var v = num((rep.mesures[i]||[])[j]);
         if(isNaN(v)) continue;
         out.push({article:rep.article||'', lot:rep.lot||'', fournisseur:rep.fournisseur||'', date:rep.date||'',
-          code:l.code, spec:l.specification||'', mini:l.mini, tolM:l.tolM, nom:l.nom, tolP:l.tolP, maxi:l.maxi,
+          cle:cleL(l), code:l.code||'', spec:l.specification||'', mini:l.mini, tolM:l.tolM, nom:l.nom, tolP:l.tolP, maxi:l.maxi,
           valeur:v, piece:j+1, gamRev:rep.gamRev, tsRev:rep.tsRev});
       }
     });
@@ -1555,7 +1682,7 @@ function analyseFiltrees(){
   function ct(v,q){ return !q || String(v||'').toLowerCase().indexOf(String(q).toLowerCase()) > -1; }
   return recs.filter(function(r){
     return ct(r.article,f.article) && ct(r.lot,f.lot) && ct(r.fournisseur,f.fournisseur)
-      && (!f.code || r.code === f.code) && (!f.date || r.date === f.date);
+      && (!f.code || r.cle === f.code) && (!f.date || r.date === f.date);
   });
 }
 /* Sortie (carte de contrôle + tableau) recalculée à chaque changement de filtre. */
@@ -1564,7 +1691,7 @@ function analyseOut(){
   var vals = filt.map(function(r){ return r.valeur; });
   var spec = (f.code && filt.length) ? {mini:filt[0].mini, maxi:filt[0].maxi, nom:filt[0].nom} : null;
   var h = '<div class="chartbox" style="border-top:0;padding:0 0 12px;background:transparent">'
-    + blocIMR(vals, spec, f.code ? ('Côte '+f.code) : 'Relevés superposés') + '</div>';
+    + blocIMR(vals, spec, f.code ? ('Côte '+(filt.length ? libPoint({code:filt[filt.length-1].code, spec:filt[filt.length-1].spec}) : '')) : 'Relevés superposés') + '</div>';
   if(!filt.length){
     h += '<div class="empty"><b>Aucun relevé</b>' + (relevesTous().length ? 'Aucun relevé ne correspond aux filtres.' : 'Enregistrez des rapports avec des mesures pour alimenter l\'analyse.') + '</div>';
     return h;
@@ -1595,7 +1722,7 @@ function analyseOut(){
 function viewAnalyse(){
   var recs = relevesTous(), f = FANA;
   var arts = {}, codes = {};
-  recs.forEach(function(r){ if(r.article) arts[r.article]=1; if(r.code) codes[r.code]=1; });
+  recs.forEach(function(r){ if(r.article) arts[r.article]=1; if(r.cle) codes[r.cle] = libPoint({code:r.code, spec:r.spec}) + (r.spec && r.code ? ' — ' + r.spec : ''); });
 
   var h = '<div class="sheet"><div class="rbar"><b>Analyses des dérives</b>'
     + '<span class="etat">' + recs.length + ' relevé' + (recs.length>1?'s':'') + ' dans ' + REPORTS.length + ' rapport' + (REPORTS.length>1?'s':'') + '</span>'
@@ -1607,7 +1734,7 @@ function viewAnalyse(){
     + '<input type="text" id="a-lot" placeholder="Lot" value="'+esc(f.lot)+'" style="min-width:110px">'
     + '<input type="text" id="a-fournisseur" placeholder="Fournisseur" value="'+esc(f.fournisseur)+'" style="min-width:130px">'
     + '<select id="a-code"><option value="">Tous points de contrôle</option>'
-    + Object.keys(codes).sort().map(function(c){ return '<option value="'+esc(c)+'"'+(f.code===c?' selected':'')+'>Point '+esc(c)+'</option>'; }).join('') + '</select>'
+    + Object.keys(codes).sort(function(a,b){ return codes[a].localeCompare(codes[b], 'fr', {numeric:true}); }).map(function(c){ return '<option value="'+esc(c)+'"'+(f.code===c?' selected':'')+'>Point '+esc(codes[c])+'</option>'; }).join('') + '</select>'
     + '<label class="hint" style="display:flex;align-items:center;gap:5px">Date <input type="date" id="a-date" value="'+esc(f.date)+'"></label>'
     + '<button class="btn sm" id="a-reset">Réinitialiser</button>'
     + '<span class="sp" style="margin-left:auto"></span>'
@@ -1703,7 +1830,7 @@ function lignesGam(archives){
     var v = version('gam', fam);
     DB.gamserie.forEach(function(g, i){
       if(g.famille !== fam) return;
-      out.push({famille:fam, code:g.code, criticite:g.criticite||'', specification:g.specification||'',
+      out.push({id:g.id||'', famille:fam, code:g.code, criticite:g.criticite||'', specification:g.specification||'',
         moyen:g.moyen||'', methode:g.methode||'', idx:i,
         rev:v?v.rev:null, dateRev:v?v.dateEffet:'', statut:v?(v.statut==='brouillon'?'brouillon':'valide'):'valide',
         edit: v ? v.statut === 'brouillon' : false});
@@ -1712,7 +1839,7 @@ function lignesGam(archives){
       revisionsDe('gam', fam).forEach(function(h){
         if(v && h.rev === v.rev) return;
         (h.photo||[]).forEach(function(l){
-          out.push({famille:fam, code:l.code, criticite:l.criticite||'', specification:l.specification||'',
+          out.push({id:l.id||'', famille:fam, code:l.code, criticite:l.criticite||'', specification:l.specification||'',
             moyen:l.moyen||'', methode:l.methode||'', idx:-1,
             rev:h.rev, dateRev:h.dateEffet, statut:'archive', edit:false});
         });
@@ -1750,7 +1877,7 @@ function psetGamserie(){
     + thf('gam','rev','Rév.','w-rev') + thf('gam','date','Date rév.','w-date') + thf('gam','statut','Statut','w-st')
     + thf('gam','famille','Famille','w-fam') + thf('gam','code','Code','w-code') + thf('gam','criticite','Criticité','w-crit')
     + thf('gam','spec','Spécification','') + thf('gam','moyen','Moyen de contrôle','w-moy') + thf('gam','methode','Méthode de contrôle','w-moy')
-    + '<th class="w-act"></th></tr></thead><tbody>';
+    + thf('gam','id','ID','w-id') + '<th class="w-act"></th></tr></thead><tbody>';
   var prec = '';
   lignes.forEach(function(l){
     var cle = l.famille + '|' + l.rev + '|' + l.statut;
@@ -1759,7 +1886,7 @@ function psetGamserie(){
     h += cellRev('gam', l, debut)
       + td('statut', statutLib(l.statut), tagStatut(l.statut), 'st')
       + td('famille', l.famille, esc(l.famille), 'fam' + (debut?'':' sub'))
-      + td('code', l.code, esc(l.code), 'cd')
+      + (l.edit ? tdTxt('code', l, 'code', 'cd') : td('code', l.code, esc(l.code||'—'), 'cd'))
       + (l.edit
           ? '<td data-k="criticite" data-v="'+esc(l.criticite)+'" class="pz"><select data-b="gamserie" data-i="'+l.idx+'" data-f="criticite">'
             + ['','Critique','Majeure','Mineure'].map(function(c){ return '<option'+(String(l.criticite)===c?' selected':'')+'>'+c+'</option>'; }).join('')
@@ -1768,6 +1895,7 @@ function psetGamserie(){
       + tdTxt('spec', l, 'specification', 'sp')
       + tdTxt('moyen', l, 'moyen', 'fam')
       + tdMeth(l)
+      + td('id', l.id, esc(l.id||'—'), 'idp')
       + '<td class="act3">' + (l.edit ? '<button class="btn sm dgr" data-delrow="gamserie" data-i="'+l.idx+'">Suppr.</button>' : '') + '</td>'
       + '</tr>';
   });
@@ -1813,11 +1941,14 @@ function lignesTS(archives){
     var fam = familleOf(art), t = tsOf(art), vals = t ? t.vals : {};
     var v = version('ts', art);
     var codes = DB.gamserie.filter(function(g){ return g.famille === fam; })
-      .map(function(g){ return {code:g.code, specification:g.specification}; });
-    var vus = {}; codes.forEach(function(c){ vus[c.code] = 1; });
-    for(var c in vals) if(!vus[c]) codes.push({code:c, specification:'(code absent de la gamme)'});
+      .map(function(g){ return {id:g.id, code:g.code, specification:g.specification}; });
+    var vus = {}; codes.forEach(function(c){ vus[c.id] = 1; });
+    for(var c in vals) if(!vus[c]){
+      var autre = ligneGamParId(c);
+      codes.push({id:c, code:autre ? autre.code : c, specification:'(hors de la gamme de la famille)'});
+    }
     codes.forEach(function(g){
-      out.push(ligneTS(art, fam, g, vals[g.code], v ? v.rev : null, v ? v.dateEffet : '',
+      out.push(ligneTS(art, fam, g, vals[g.id], v ? v.rev : null, v ? v.dateEffet : '',
         v ? (v.statut === 'brouillon' ? 'brouillon' : 'valide') : 'valide',
         v ? v.statut === 'brouillon' : false, v ? (v.indiceDef||'') : ''));
     });
@@ -1826,8 +1957,8 @@ function lignesTS(archives){
         if(v && hh.rev === v.rev) return;
         var ph = hh.photo || {};
         codes.forEach(function(g){
-          if(!ph[g.code]) return;
-          out.push(ligneTS(art, fam, g, ph[g.code], hh.rev, hh.dateEffet, 'archive', false, hh.indiceDef||''));
+          if(!ph[g.id]) return;
+          out.push(ligneTS(art, fam, g, ph[g.id], hh.rev, hh.dateEffet, 'archive', false, hh.indiceDef||''));
         });
       });
     }
@@ -1840,7 +1971,7 @@ function ligneTS(art, fam, g, val, rev, dateRev, statut, edit, indiceDef){
   var brut = String(val[0]===null||val[0]===undefined?'':val[0]).trim();
   var vide = brut === '', na = brut === '-' || (isNaN(nom) && !vide);
   return {
-    article:art, famille:fam||'', code:g.code, specification:g.specification||'',
+    article:art, famille:fam||'', id:g.id||'', code:g.code||'', specification:g.specification||'',
     brut:val, vide:vide, na:na,
     mini:(na||vide||isNaN(nom))?null:nom+(isNaN(tm)?0:tm),
     maxi:(na||vide||isNaN(nom))?null:nom+(isNaN(tp)?0:tp),
@@ -1882,7 +2013,7 @@ function psetTS(){
 
   h += '<div class="scroll tall"><table class="flat" data-tbl="ts"><thead><tr>'
     + thf('ts','rev','Rév.','w-rev') + thf('ts','date','Date rév.','w-date') + thf('ts','statut','Statut','w-st')
-    + thf('ts','article','Article','w-art') + thf('ts','famille','Famille','w-fam') + thf('ts','code','Code','w-code')
+    + thf('ts','article','Article','w-art') + thf('ts','famille','Famille','w-fam') + thf('ts','code','Code','w-code') + thf('ts','id','ID','w-id')
     + thf('ts','typespec','Type spéc.','w-type') + thf('ts','typesaisie','Type saisie','w-type')
     + thf('ts','nom','Nominal','w-val') + thf('ts','tolm','Tol -','w-val')
     + thf('ts','tolp','Tol +','w-val') + thf('ts','mini','Mini.','w-val') + thf('ts','maxi','Maxi.','w-val')
@@ -1896,7 +2027,8 @@ function psetTS(){
       + td('statut', statutLib(l.statut), tagStatut(l.statut), 'st')
       + td('article', l.article, (debut ? '<b>'+esc(l.article)+'</b>' + (l.indiceDef ? '<br><span class="hint">'+esc(l.indiceDef)+'</span>' : '') : esc(l.article)), 'art' + (debut?'':' sub'))
       + td('famille', l.famille, esc(l.famille||'—'), 'fam')
-      + td('code', l.code, esc(l.code), 'cd')
+      + td('code', l.code, esc(l.code||'—'), 'cd')
+      + td('id', l.id, esc(l.id||'—'), 'idp')
       + tdTypeSpec(l)
       + td('typesaisie', l.type, l.type, 'ty')
       + tdVal(l, 0, 'nom') + tdVal(l, 1, 'tolm') + tdVal(l, 2, 'tolp')
@@ -1912,7 +2044,7 @@ function tdVal(l, k, colonne){
   var v = l.brut[k];
   v = (v===null||v===undefined) ? '' : v;
   if(!l.edit) return td(colonne, v, esc(v===''?'—':v), 'bn');
-  return '<td data-k="'+colonne+'" data-v="'+esc(v)+'" class="mono"><input data-tsa="'+esc(l.article)+'" data-ts="'+esc(l.code)+'" data-k="'+k+'" data-cell="'+colonne+'" inputmode="decimal" value="'+esc(v)+'"></td>';
+  return '<td data-k="'+colonne+'" data-v="'+esc(v)+'" class="mono"><input data-tsa="'+esc(l.article)+'" data-ts="'+esc(l.id)+'" data-k="'+k+'" data-cell="'+colonne+'" inputmode="decimal" value="'+esc(v)+'"></td>';
 }
 /* Colonne TYPE SPEC : Générale / Individuelle / (vide) — stockée en 4e position du TS (index 3) */
 function tdTypeSpec(l){
@@ -1921,7 +2053,7 @@ function tdTypeSpec(l){
   var opts = ['','Générale','Individuelle'].map(function(o){
     return '<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+(o||'—')+'</option>';
   }).join('');
-  return '<td data-k="typespec" data-v="'+esc(v)+'" class="pz"><select data-tsa="'+esc(l.article)+'" data-ts="'+esc(l.code)+'" data-k="3" data-cell="typespec">'+opts+'</select></td>';
+  return '<td data-k="typespec" data-v="'+esc(v)+'" class="pz"><select data-tsa="'+esc(l.article)+'" data-ts="'+esc(l.id)+'" data-k="3" data-cell="typespec">'+opts+'</select></td>';
 }
 
 function majBornes(el, val){
@@ -2903,7 +3035,7 @@ function bindParametres(){
     if(!brouillons.length){ toast('Ouvrez d\'abord une révision sur la famille à compléter.'); return; }
     var f = brouillons.length === 1 ? brouillons[0] : prompt('Famille à compléter (' + brouillons.join(', ') + ') :', brouillons[0]);
     if(!f || !modifiable('gam', f.trim())){ toast('Famille non modifiable : sa révision doit être en brouillon.'); return; }
-    DB.gamserie.push({famille:f.trim(), code:'', criticite:'Majeure', specification:'', moyen:'', methode:''});
+    DB.gamserie.push({id:nouvelId(), famille:f.trim(), code:'', criticite:'Majeure', specification:'', moyen:'', methode:''});
     saveDB(); render();
   };
   if(b = document.getElementById('g-newrev')) b.onclick = function(){ nouvellesRevisions('gam', clesAffichees('gam')); };
@@ -2932,8 +3064,8 @@ function bindParametres(){
     x.onclick = function(){
       var a = x.dataset.incdel, t = tsOf(a), fam = familleOf(a);
       if(!t || !modifiable('ts', a)) return;
-      var codes = Object.keys(t.vals).filter(function(c){ return !gammeDe(fam).some(function(g){ return g.code === c; }); });
-      if(!confirm('Retirer de TS les valeurs de ' + a + ' sur les codes hors gamme (' + codes.join(', ') + ') ?')) return;
+      var codes = Object.keys(t.vals).filter(function(c){ return !gammeDe(fam).some(function(g){ return g.id === c; }); });
+      if(!confirm('Retirer de TS les valeurs de ' + a + ' sur les points hors gamme (' + codes.map(function(c){ var g = ligneGamParId(c); return g ? libPoint(g) : c; }).join(', ') + ') ?')) return;
       codes.forEach(function(c){ delete t.vals[c]; });
       saveDB(); syncLignes(); saveDraft(); render();
       toast(codes.length + ' valeur' + (codes.length>1?'s':'') + ' hors gamme retirée' + (codes.length>1?'s':'') + '.');
@@ -2967,7 +3099,7 @@ function bindParametres(){
     var f = prompt('Nom de la nouvelle famille de contrôle :', '');
     if(!f) return; f = f.trim();
     if(familles().indexOf(f) > -1){ toast('Cette famille existe déjà.'); return; }
-    DB.gamserie.push({famille:f, code:'A', criticite:'Majeure', specification:'', moyen:'', methode:''});
+    DB.gamserie.push({id:nouvelId(), famille:f, code:'A', criticite:'Majeure', specification:'', moyen:'', methode:''});
     VERS.gam[f] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de la famille', creeLe:new Date().toISOString()};
     saveDB(); saveVersions(); journaliser('gam', f, 0, 'Famille créée', '');
     FGAM.famille = f; render();
@@ -3036,7 +3168,7 @@ function bindPanneauParam(){
   if(b = document.getElementById('s-reset')) b.onclick = function(){
     if(!confirm('Remplacer les 3 bases par les données du prototype Excel ? Les rapports enregistrés sont conservés.')) return;
     DB = clone(SEED); VERS = {gam:{}, ts:{}}; HIST = []; 
-    saveDB(); saveVersions(); saveHist();
+    migrerIds(); saveDB(); saveVersions(); saveHist();
     journaliser('gam', '(toutes)', 0, 'Réinitialisation', 'bases remises à la version du prototype');
     initVersions(); syncLignes(); saveDraft(); render(); toast('Bases réinitialisées en révision 0.');
   };

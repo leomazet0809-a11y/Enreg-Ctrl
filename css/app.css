@@ -620,3 +620,7 @@ table.flat.inc td.act3 .btn + .btn{margin-left:6px}
 .panneau-param .pp-aide{margin:10px 0 12px;line-height:1.5}
 .panneau-param .apercu{max-width:none}
 @media print{.panneau-param{display:none}}
+
+/* --- Identifiant unique des points (GAMSERIE, TS) --- */
+.w-id{width:86px}
+table.flat td.idp{font-family:var(--mono);font-size:11.5px;color:var(--ink3);letter-spacing:.02em}
