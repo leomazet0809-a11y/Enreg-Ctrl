@@ -203,6 +203,79 @@ function specKind(l){
 function aIndividuelles(){ return R.lignes.some(function(l){ return specKind(l) === 'individuelle' && l.testable; }); }
 
 /* =======================================================================
+   Gamme -> TS : préparation des lignes d'un article et contrôle de cohérence
+   ======================================================================= */
+/* Points de contrôle (avec un code) de la gamme d'une famille, dans l'ordre */
+function gammeDe(fam){
+  return DB.gamserie.filter(function(g){ return g.famille === fam && String(g.code||'').trim() !== ''; });
+}
+/* Type de spécification le plus utilisé pour ce point par les autres articles de la famille */
+function typeSpecUsuel(fam, code, sauf){
+  var n = {}, best = '', max = 0;
+  DB.matrice.forEach(function(m){
+    if(m.famille !== fam || m.article === sauf) return;
+    var t = tsOf(m.article), v = t && t.vals ? t.vals[code] : null;
+    var ty = v ? String(v[3]===undefined||v[3]===null?'':v[3]).trim() : '';
+    if(ty) n[ty] = (n[ty]||0) + 1;
+  });
+  for(var k in n) if(n[k] > max){ max = n[k]; best = k; }
+  return best;
+}
+/* Crée dans TS une ligne par point de la gamme de la famille de l'article (les lignes
+   existantes sont conservées). modele = article dont on recopie les valeurs, sinon
+   valeurs vides et type de spécification usuel de la famille. Renvoie le nombre de lignes créées. */
+function preparerTS(article, modele){
+  var fam = familleOf(article);
+  if(!fam) return 0;
+  var t = tsOf(article);
+  if(!t){ t = {article:article, vals:{}}; DB.ts.push(t); }
+  if(!t.vals) t.vals = {};
+  var src = modele ? tsOf(modele) : null, n = 0;
+  gammeDe(fam).forEach(function(g){
+    var v = t.vals[g.code];
+    if(v && String(v[0]===null||v[0]===undefined?'':v[0]).trim() !== '') return;  // déjà renseigné
+    var s = src && src.vals ? src.vals[g.code] : null;
+    if(s) t.vals[g.code] = clone(s);
+    else if(!v) t.vals[g.code] = ['', '', '', typeSpecUsuel(fam, g.code, article)];
+    else return;
+    n++;
+  });
+  return n;
+}
+function valeurTSVide(v){
+  if(!v) return true;
+  for(var k=0;k<3;k++){ if(String(v[k]===null||v[k]===undefined?'':v[k]).trim() !== '') return false; }
+  return true;
+}
+/* Incohérences du paramétrage, une entrée par article et par type :
+   'sansfam'  article sans famille (absent de la Matrice ou famille vide)
+   'faminc'   famille inconnue dans GAMSERIE
+   'manque'   points de la gamme sans valeur (nominal vide) dans TS
+   'orphelin' valeurs TS sur des codes absents de la gamme de la famille */
+function incoherences(){
+  var gam = {}, out = [];
+  DB.gamserie.forEach(function(g){
+    var c = String(g.code||'').trim(); if(!c) return;
+    (gam[g.famille] = gam[g.famille] || {})[g.code] = 1;
+  });
+  articles().forEach(function(art){
+    if(!String(art||'').trim()) return;
+    var fam = familleOf(art), t = tsOf(art), vals = t && t.vals ? t.vals : {};
+    if(!String(fam||'').trim()){ out.push({type:'sansfam', article:art, famille:'', codes:[]}); return; }
+    if(!gam[fam]){ out.push({type:'faminc', article:art, famille:fam, codes:[]}); return; }
+    var manque = [], orph = [];
+    gammeDe(fam).forEach(function(g){
+      var v = vals[g.code];
+      if(!v || String(v[0]===null||v[0]===undefined?'':v[0]).trim() === '') manque.push(g.code);
+    });
+    for(var c in vals) if(!gam[fam][c] && !valeurTSVide(vals[c])) orph.push(c);
+    if(manque.length) out.push({type:'manque', article:art, famille:fam, codes:manque});
+    if(orph.length) out.push({type:'orphelin', article:art, famille:fam, codes:orph});
+  });
+  return out;
+}
+
+/* =======================================================================
    Statut du rapport, gel (lecture seule) et non-conformités
    ======================================================================= */
 var ORIGINES = ['Contrôle d\'entrée', 'Produit « déjà entré dans l\'usine »'];
@@ -1400,6 +1473,11 @@ function viewHistorique(){
       + esc([R.article || 'sans article', R.lot ? 'lot ' + R.lot : ''].filter(Boolean).join(' · ')) + '</span>'
       + '<span class="sp"></span><button class="btn sm" id="h-abandon">Abandonner</button><button class="btn sm pri" id="h-reprendre">Reprendre</button></div>';
   }
+  var nInc = incoherences().length;
+  if(nInc){
+    h += '<div class="encours incmenu"><span><b>Paramétrage incomplet</b> — ' + nInc + ' incohérence' + (nInc>1?'s':'')
+      + ' entre la Matrice, les gammes et les valeurs TS.</span><span class="sp"></span><button class="btn sm" id="h-incoh">Voir</button></div>';
+  }
   h += '<div class="toolbar"><input type="search" id="q" placeholder="Rechercher un article, un lot, un fournisseur…" value="'+esc(window.__q||'')+'">'
      + '<span class="hint" id="q-count">'+list.length+' rapport'+(list.length>1?'s':'')+'</span>'
      + '<span class="hint" style="margin-left:auto">Cliquez sur un rapport pour l\'ouvrir.</span></div>';
@@ -1539,6 +1617,7 @@ function bindAnalyse(){
 
 /* ---------- vue paramètres ---------- */
 function viewParametres(){
+  var nInc = incoherences().length;
   var h = '<div class="sheet">'
     + '<div class="rbar"><b>Paramètres</b>'
     + '<button class="close noprint" id="p-fermer" title="Fermer les paramètres et revenir aux rapports enregistrés" aria-label="Fermer les paramètres">'
@@ -1548,6 +1627,7 @@ function viewParametres(){
     + '<button data-pset="gamserie" aria-current="'+(PSET==='gamserie')+'">GAMSERIE — gammes de contrôle</button>'
     + '<button data-pset="ts" aria-current="'+(PSET==='ts')+'">TS — valeurs par article</button>'
     + '<button data-pset="matrice" aria-current="'+(PSET==='matrice')+'">Matrice — article / fournisseur</button>'
+    + '<button data-pset="coherence" aria-current="'+(PSET==='coherence')+'">Cohérence' + (nInc ? ' <span class="nbinc">'+nInc+'</span>' : '') + '</button>'
     + '<button data-pset="revisions" aria-current="'+(PSET==='revisions')+'">Révisions</button>'
     + '<button data-pset="documents" aria-current="'+(PSET==='documents')+'">Documents ('+DOCS.length+')</button>'
     + '<button data-pset="sauvegarde" aria-current="'+(PSET==='sauvegarde')+'">Sauvegarde</button>'
@@ -1557,6 +1637,7 @@ function viewParametres(){
   else if(PSET === 'matrice') h += psetMatrice();
   else if(PSET === 'documents') h += psetDocuments();
   else if(PSET === 'revisions') h += psetRevisions();
+  else if(PSET === 'coherence') h += psetCoherence();
   else h += psetSauvegarde();
   h += '</div></div>';
   return h;
@@ -1963,6 +2044,134 @@ function psetMatrice(){
   h += '</tbody></table></div>';
   return h;
 }
+/* --- Cohérence du paramétrage : Matrice / GAMSERIE / TS --- */
+var LIB_INC = {
+  sansfam:  {titre:'Articles sans famille', aide:'Aucune famille dans la Matrice : le rapport de ces articles ne peut pas être construit.'},
+  faminc:   {titre:'Familles inconnues', aide:'La famille indiquée dans la Matrice n\'existe pas dans GAMSERIE (vérifiez l\'orthographe).'},
+  manque:   {titre:'Points de la gamme sans valeur dans TS', aide:'Nominal vide : le point ne peut pas être contrôlé. Saisissez la valeur, ou « - » s\'il ne s\'applique pas à l\'article.'},
+  orphelin: {titre:'Valeurs TS hors gamme', aide:'Valeurs saisies sur un code qui n\'existe pas dans la gamme de la famille : elles ne sont pas utilisées dans les rapports.'}
+};
+function psetCoherence(){
+  var inc = incoherences();
+  var h = '<p class="hint" style="margin:0 0 12px;max-width:95ch">Tous les articles d\'une famille suivent la même gamme (points, moyens et méthodes de contrôle) ; '
+    + 'seules les valeurs changent d\'un article à l\'autre, dans TS. Cet écran liste ce qui empêche un article d\'avoir un rapport complet.</p>';
+  if(!inc.length) return h + '<div class="empty ok-empty"><b>Aucune incohérence</b>Chaque article a une famille connue, et chaque point de sa gamme a une valeur dans TS.</div>';
+  ['sansfam','faminc','manque','orphelin'].forEach(function(ty){
+    var l = inc.filter(function(x){ return x.type === ty; });
+    if(!l.length) return;
+    h += '<section class="incgrp"><h3>' + LIB_INC[ty].titre + ' <span class="nbinc">' + l.length + '</span></h3>'
+      + '<p class="hint">' + LIB_INC[ty].aide + '</p>'
+      + '<div class="scroll"><table class="flat inc"><thead><tr><th class="w-art">Article</th><th class="w-fam">Famille</th><th>Détail</th><th class="w-act2"></th></tr></thead><tbody>';
+    l.forEach(function(x){
+      var det = '', act = '';
+      if(ty === 'sansfam'){
+        det = matriceOf(x.article) ? 'Famille vide dans la Matrice' : 'Article absent de la Matrice';
+        act = '<button class="btn sm pri" data-incfam="'+esc(x.article)+'">Choisir la famille</button>';
+      } else if(ty === 'faminc'){
+        det = '« ' + esc(x.famille) + ' » absente de GAMSERIE';
+        act = '<button class="btn sm pri" data-incfam="'+esc(x.article)+'">Choisir la famille</button>';
+      } else {
+        det = x.codes.length + ' point' + (x.codes.length>1?'s':'') + ' : <span class="mono">' + esc(x.codes.slice(0,12).join(', ')) + (x.codes.length>12 ? ' …' : '') + '</span>';
+        if(ty === 'manque') act = '<button class="btn sm pri" data-incts="'+esc(x.article)+'">Saisir les valeurs</button>';
+        else act = '<button class="btn sm" data-incts="'+esc(x.article)+'">Voir dans TS</button>'
+          + (modifiable('ts', x.article) ? '<button class="btn sm dgr" data-incdel="'+esc(x.article)+'">Retirer</button>' : '');
+      }
+      h += '<tr><td class="art"><b>' + esc(x.article) + '</b></td><td>' + esc(x.famille || '—') + '</td><td>' + det + '</td><td class="act3">' + act + '</td></tr>';
+    });
+    h += '</tbody></table></div></section>';
+  });
+  return h;
+}
+/* Options de la liste des familles (avec le nombre de points de leur gamme) */
+function optionsFamilles(sel){
+  var fams = familles().filter(function(f){ return gammeDe(f).length; });
+  return '<option value="">— choisir —</option>' + fams.map(function(f){
+    var n = gammeDe(f).length;
+    return '<option value="'+esc(f)+'"'+(f===sel?' selected':'')+'>'+esc(f)+' ('+n+' point'+(n>1?'s':'')+')</option>';
+  }).join('');
+}
+function optionsModeles(fam, sauf){
+  var arts = DB.matrice.filter(function(m){ return m.famille === fam && m.article && m.article !== sauf && tsOf(m.article) && !valeursVides(m.article); })
+    .map(function(m){ return m.article; }).filter(function(a, i, t){ return t.indexOf(a) === i; }).sort();
+  return '<option value="">Valeurs vides, à saisir</option>' + arts.map(function(a){
+    return '<option value="'+esc(a)+'">Copier les valeurs de '+esc(a)+'</option>';
+  }).join('');
+}
+/* Création d'un article : référence, fournisseur, famille ; ses lignes TS sont
+   préparées à partir de la gamme de la famille, il ne reste que les valeurs à saisir. */
+function creerArticle(){
+  modal('Nouvel article',
+    '<div class="form1">'
+    + '<label>Référence de l\'article<input id="na-art" autocomplete="off" placeholder="ex. 041038_CBMI"></label>'
+    + '<label>Code fournisseur (facultatif)<input id="na-four" autocomplete="off"></label>'
+    + '<label>Famille de contrôle<select id="na-fam">' + optionsFamilles('') + '</select></label>'
+    + '<label>Valeurs de départ<select id="na-mod">' + optionsModeles('', '') + '</select></label>'
+    + '<p class="hint" id="na-info" style="margin:0">Les points de contrôle, moyens et méthodes viennent de la gamme de la famille : seules les valeurs sont à saisir.</p>'
+    + '</div>', function(){}, 'Annuler');
+  var ft = document.querySelector('.modal .ft');
+  ft.innerHTML = '<button class="btn" data-x2>Annuler</button><button class="btn pri" data-ok2>Créer l\'article</button>';
+  var fam = document.getElementById('na-fam'), mod = document.getElementById('na-mod'), art = document.getElementById('na-art');
+  fam.onchange = function(){
+    mod.innerHTML = optionsModeles(fam.value, art.value.trim());
+    var n = fam.value ? gammeDe(fam.value).length : 0;
+    document.getElementById('na-info').textContent = fam.value
+      ? n + ' point' + (n>1?'s':'') + ' de contrôle repris de la gamme « ' + fam.value + ' » : seules les valeurs sont à saisir.'
+      : 'Les points de contrôle, moyens et méthodes viennent de la gamme de la famille : seules les valeurs sont à saisir.';
+  };
+  art.focus();
+  ft.querySelector('[data-x2]').onclick = function(){ document.querySelector('.modal').remove(); };
+  ft.querySelector('[data-ok2]').onclick = function(){
+    var a = art.value.trim(), f = fam.value, fo = document.getElementById('na-four').value.trim();
+    if(!a){ toast('Indiquez la référence de l\'article.'); art.focus(); return; }
+    if(!f){ toast('Choisissez la famille de contrôle.'); fam.focus(); return; }
+    if(tsOf(a) && !valeursVides(a)){ toast('L\'article ' + a + ' existe déjà dans TS.'); art.focus(); return; }
+    var m = matriceOf(a);
+    if(!m) DB.matrice.push({article:a, fournisseur:fo, famille:f});
+    else { m.famille = f; if(fo && !m.fournisseur) m.fournisseur = fo; }
+    var va = version('ts', a);
+    if(va && va.statut === 'applicable') nouvelleRevision('ts', a);
+    else if(!va)
+      VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', indiceDef:'', creeLe:new Date().toISOString()};
+    var n = preparerTS(a, mod.value);
+    saveDB(); saveVersions(); journaliser('ts', a, version('ts', a).rev, 'Article créé', 'famille ' + f + (mod.value ? ', valeurs copiées de ' + mod.value : ''));
+    document.querySelector('.modal').remove();
+    PSET = 'ts'; TSVUE = ''; FTS = {article:a}; syncLignes(); saveDraft(); render();
+    toast(a + ' créé : ' + n + ' point' + (n>1?'s':'') + ' de contrôle ' + (mod.value ? 'repris de ' + mod.value + '.' : 'à renseigner.'));
+  };
+}
+/* L'article n'a encore aucune valeur saisie dans TS */
+function valeursVides(a){
+  var t = tsOf(a); if(!t || !t.vals) return true;
+  for(var c in t.vals) if(!valeurTSVide(t.vals[c])) return false;
+  return true;
+}
+/* Rattache un article à une famille (Matrice), puis prépare ses lignes TS si possible */
+function choisirFamille(a){
+  var m = matriceOf(a);
+  modal('Famille de ' + a,
+    '<div class="form1"><label>Famille de contrôle<select id="cf-fam">' + optionsFamilles(m ? m.famille : '') + '</select></label>'
+    + (m && m.famille && !gammeDe(m.famille).length ? '<p class="hint" style="margin:0">Famille actuelle « ' + esc(m.famille) + ' » : absente de GAMSERIE.</p>' : '')
+    + '</div>', function(){}, 'Annuler');
+  var ft = document.querySelector('.modal .ft');
+  ft.innerHTML = '<button class="btn" data-x2>Annuler</button><button class="btn pri" data-ok2>Enregistrer</button>';
+  ft.querySelector('[data-x2]').onclick = function(){ document.querySelector('.modal').remove(); };
+  ft.querySelector('[data-ok2]').onclick = function(){
+    var f = document.getElementById('cf-fam').value;
+    if(!f){ toast('Choisissez une famille.'); return; }
+    if(m) m.famille = f; else DB.matrice.push({article:a, fournisseur:'', famille:f});
+    var n = 0, v = version('ts', a);
+    if(!v || v.statut === 'brouillon'){
+      if(!v) VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', indiceDef:'', creeLe:new Date().toISOString()};
+      n = preparerTS(a);
+      saveVersions();
+    }
+    saveDB(); syncLignes(); saveDraft();
+    document.querySelector('.modal').remove();
+    render();
+    toast(a + ' rattaché à la famille ' + f + (n ? ' : ' + n + ' point' + (n>1?'s':'') + ' préparé' + (n>1?'s':'') + ' dans TS.' : '.'));
+  };
+}
+
 function tdInput(base, i, f, v, edit){
   return '<td><input data-b="'+base+'" data-i="'+i+'" data-f="'+f+'" value="'+esc(v)+'"'
     + (edit === false ? ' readonly class="ro"' : '') + '></td>';
@@ -2522,6 +2731,7 @@ function bindHistorique(){
   var b;
   if(b = document.getElementById('h-analyse')) b.onclick = function(){ VIEW = 'analyse'; render(); };
   if(b = document.getElementById('h-parametres')) b.onclick = function(){ VIEW = 'parametres'; render(); };
+  if(b = document.getElementById('h-incoh')) b.onclick = function(){ VIEW = 'parametres'; PSET = 'coherence'; render(); };
   if(b = document.getElementById('h-reprendre')) b.onclick = function(){ VIEW = 'rapport'; render(); };
   if(b = document.getElementById('h-abandon')) b.onclick = function(){
     if(!confirm('Abandonner le rapport en cours ? Les saisies seront perdues.')) return;
@@ -2575,10 +2785,22 @@ function bindParametres(){
   document.querySelectorAll('[data-pset]').forEach(function(b){ b.onclick = function(){ PSET = b.dataset.pset; render(); }; });
 
   document.querySelectorAll('[data-b]').forEach(function(el){
-    el.oninput = el.onchange = function(){
+    el.oninput = function(){
       DB[el.dataset.b][+el.dataset.i][el.dataset.f] = el.value;
       if(el.dataset.cell && el.parentNode) el.parentNode.setAttribute('data-v', el.value);
       saveDB(); syncLignes(); saveDraft();
+    };
+    el.onchange = function(){
+      el.oninput();
+      /* Matrice : famille ou article validé -> lignes TS préparées depuis la gamme (si TS modifiable) */
+      if(el.dataset.b === 'matrice' && (el.dataset.f === 'famille' || el.dataset.f === 'article')){
+        var a = String(DB.matrice[+el.dataset.i].article||'').trim(), v = a ? version('ts', a) : null;
+        if(a && gammeDe(familleOf(a)).length && (!v || v.statut === 'brouillon')){
+          if(!v) VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', indiceDef:'', creeLe:new Date().toISOString()};
+          var n = preparerTS(a);
+          if(n){ saveVersions(); saveDB(); syncLignes(); saveDraft(); toast(a + ' : ' + n + ' point' + (n>1?'s':'') + ' de la gamme ajouté' + (n>1?'s':'') + ' dans TS, valeurs à saisir.'); }
+        }
+      }
     };
   });
   document.querySelectorAll('[data-delrow]').forEach(function(b){
@@ -2635,20 +2857,7 @@ function bindParametres(){
 
   if(b = document.getElementById('ts-vue')) b.onchange = function(){ TSVUE = b.value; render(); };
   if(b = document.getElementById('ts-arch')) b.onchange = function(){ TARCH = b.checked; render(); };
-  if(b = document.getElementById('ts-add')) b.onclick = function(){
-    var a = prompt('Référence du nouvel article :', '');
-    if(!a) return; a = a.trim();
-    if(!a) return;
-    if(!tsOf(a)) DB.ts.push({article:a, vals:{}});
-    if(!familleOf(a)){
-      var f = prompt('Famille de contrôle pour ' + a + ' :', familles()[0] || '');
-      if(f) DB.matrice.push({article:a, famille:f.trim()});
-    }
-    VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', indiceDef:'', creeLe:new Date().toISOString()};
-    saveDB(); saveVersions(); journaliser('ts', a, 0, 'Article créé', '');
-    FTS.article = a; render();
-    toast(a + ' créé en révision 0 (brouillon).');
-  };
+  if(b = document.getElementById('ts-add')) b.onclick = creerArticle;
   if(b = document.getElementById('ts-newrev')) b.onclick = function(){ nouvellesRevisions('ts', clesAffichees('ts')); };
   if(b = document.getElementById('ts-valrev')) b.onclick = function(){ validerBrouillons('ts', clesAffichees('ts')); };
   if(b = document.getElementById('ts-exp')) b.onclick = exportTS;
@@ -2656,7 +2865,23 @@ function bindParametres(){
   if(b = document.getElementById('ts-imp-r')) b.onclick = function(){ importCSV('ts','remplacer'); };
   if(b = document.getElementById('ts-imp-m')) b.onclick = function(){ importCSV('ts','maj'); };
 
-  if(b = document.getElementById('m-add')) b.onclick = function(){ DB.matrice.push({article:'', famille:''}); saveDB(); render(); };
+  if(b = document.getElementById('m-add')) b.onclick = creerArticle;
+
+  document.querySelectorAll('[data-incfam]').forEach(function(x){ x.onclick = function(){ choisirFamille(x.dataset.incfam); }; });
+  document.querySelectorAll('[data-incts]').forEach(function(x){
+    x.onclick = function(){ PSET = 'ts'; FTS = {article:x.dataset.incts}; TSVUE = ''; TARCH = false; render(); };
+  });
+  document.querySelectorAll('[data-incdel]').forEach(function(x){
+    x.onclick = function(){
+      var a = x.dataset.incdel, t = tsOf(a), fam = familleOf(a);
+      if(!t || !modifiable('ts', a)) return;
+      var codes = Object.keys(t.vals).filter(function(c){ return !gammeDe(fam).some(function(g){ return g.code === c; }); });
+      if(!confirm('Retirer de TS les valeurs de ' + a + ' sur les codes hors gamme (' + codes.join(', ') + ') ?')) return;
+      codes.forEach(function(c){ delete t.vals[c]; });
+      saveDB(); syncLignes(); saveDraft(); render();
+      toast(codes.length + ' valeur' + (codes.length>1?'s':'') + ' hors gamme retirée' + (codes.length>1?'s':'') + '.');
+    };
+  });
   if(b = document.getElementById('m-exp')) b.onclick = exportMatrice;
   if(b = document.getElementById('m-imp-r')) b.onclick = function(){ importCSV('matrice','remplacer'); };
   if(b = document.getElementById('m-imp-m')) b.onclick = function(){ importCSV('matrice','maj'); };
