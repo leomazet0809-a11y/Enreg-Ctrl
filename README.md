@@ -4,6 +4,19 @@ Application web de saisie des **rapports de contrôle d'entrée** : gammes de co
 
 Tout le projet est enregistré dans un **classeur Excel (.xlsx)** dont vous choisissez l'emplacement.
 
+## Version Excel autonome (.xlsm, sans navigateur)
+
+Le fichier **`excel/Enregistrements-Controle.xlsm`** contient toute l'application dans un seul classeur Excel avec macros (VBA) : rapports de contrôle, GAMSERIE, TS, Matrice, documents PDF, révisions, cohérence et analyses des dérives (sans cartes de contrôle). Il n'a besoin ni de navigateur ni d'internet.
+
+1. Sur GitHub, ouvrez le dossier `excel`, cliquez sur `Enregistrements-Controle.xlsm`, puis sur **Download** (ou utilisez le ZIP du projet).
+2. **Avant la première ouverture** : clic droit sur le fichier → *Propriétés* → cochez **Débloquer** → *OK* (sinon Windows bloque les macros d'un fichier venant d'internet).
+3. Ouvrez-le dans Excel et cliquez sur **Activer le contenu** si le bandeau jaune apparaît. Les boutons s'installent sur chaque onglet.
+4. L'onglet **Aide** du classeur explique le fonctionnement. Mot de passe méthodiste par défaut : `1` (onglet *Paramètres*).
+
+Si Excel signale un problème avec le projet VBA, ouvrez un classeur vide, *Alt+F11* → *Fichier → Importer un fichier…* et importez les cinq fichiers du dossier `excel/modules-a-importer`.
+
+Pour les développeurs : `python3 excel/construire.py` reconstruit le classeur à partir des modules `excel/vba/*.bas` (LibreOffice et openpyxl nécessaires) ; `python3 excel/tests/tester_macros.py excel/Enregistrements-Controle.xlsm` exécute les macros dans LibreOffice et vérifie les résultats.
+
 ## Démarrer
 
 Deux façons d'ouvrir l'application, avec **Google Chrome** ou **Microsoft Edge** :
