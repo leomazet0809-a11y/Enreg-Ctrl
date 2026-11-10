@@ -71,6 +71,9 @@ input[type="date"]{color-scheme:inherit}
 .fichier.mod .pastille{background:var(--amber)}
 .fichier.mod .f-txt span{color:var(--amber)}
 .fichier.en-cours .pastille{background:var(--accent);animation:pulse 1s infinite}
+/* Nom du classeur et état d'enregistrement masqués (la disquette du ruban indique l'état) */
+#fichier{display:none!important}
+.topright{justify-content:flex-end}
 @keyframes pulse{50%{opacity:.3}}
 .btn-save{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 15px;border:0;border-radius:9px;
   background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:13px;box-shadow:var(--shadow)}
@@ -351,8 +354,9 @@ body.viewer .viewpane{display:flex}
 .bar-use i{display:block;height:100%;background:var(--accent);border-radius:4px}
 
 /* ---------- rapport figé, moyens, cartes de contrôle ---------- */
-.figebar{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--amberbg);border-bottom:1px solid var(--amberbd);color:var(--amber);font-size:13px}
-.figebar .lock{font-size:14px}
+.cadenas{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;color:var(--ink2);background:none;border:0;padding:0;border-radius:var(--radius-sm)}
+button.cadenas{cursor:pointer}
+button.cadenas:hover{background:var(--hover);color:var(--ink)}
 .sheet.fige input[readonly],.sheet.fige input[disabled],.sheet.fige select[disabled],.sheet.fige textarea[readonly]{background:var(--subtle);color:var(--ink2);cursor:not-allowed}
 .sheet.fige button.q[disabled]{opacity:.65;cursor:not-allowed}
 .c-moy{width:96px;text-align:left}
@@ -560,6 +564,8 @@ table.flat.inc td.act3 .btn + .btn{margin-left:6px}
 .icon-btn svg,.btn-save svg{flex:none}
 
 /* --- Rapports enregistrés : lignes plus fines, colonnes de largeur fixe --- */
+/* Liste des rapports : Lot, Commande, Date et Contrôleur ont chacun leur colonne */
+.rowlist[data-list="rapports"]{--cols:minmax(0,1.3fr) minmax(0,1.1fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,.8fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,.9fr) minmax(0,.9fr) 170px}
 .rowlist[data-list="rapports"] > .r>div{padding:4px 11px;line-height:1.35}
 .rowlist[data-list="rapports"] > .r.head>div{padding:6px 11px}
 .rowlist[data-list="rapports"] .act2 .btn.sm{height:24px;padding:0 8px;font-size:12px}

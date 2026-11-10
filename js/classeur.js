@@ -234,7 +234,7 @@ function feuille(rows){
 }
 function tableauRapports(){
   var rows = [['Date','Article','Lot','Commande','Fournisseur','Contrôleur','Origine','Qté commandée','Qté réceptionnée','Qté échantillon',
-    'Conformes','Non conformes','Durée contrôle','Décision','Type NC','Sous-type NC','Gamme','Rév. gamme','Rév. valeurs','Indice de définition','Commentaires','Identifiant']];
+    'Conformes','Non conformes','Durée contrôle','Décision','Type NC','Sous-type NC','Gamme','Rév. gamme','Rév. valeurs','Commentaires','Identifiant']];
   REPORTS.slice().sort(function(a,b){ return String(b.date||'') < String(a.date||'') ? -1 : String(b.date||'') > String(a.date||'') ? 1 : 0; })
     .forEach(function(r){
       var t = totaux2(r);
@@ -242,7 +242,7 @@ function tableauRapports(){
         nombreOuTexte(r.qteCommandee), nombreOuTexte(r.qteReceptionnee), nombreOuTexte(r.qteEchantillon),
         t.conforme, t.nonConforme, r.dureeControle, libDecision(r.decision), r.typeNC||'', r.sousTypeNC||'',
         r.famille||'', r.gamRev===null||r.gamRev===undefined?'':r.gamRev, r.tsRev===null||r.tsRev===undefined?'':r.tsRev,
-        r.indiceDef||'', r.commentaires||'', r.id]);
+        r.commentaires||'', r.id]);
     });
   return rows;
 }
@@ -411,16 +411,18 @@ function avantEnregistrement(){
   if(typeof autoT !== 'undefined') clearTimeout(autoT);
   if(VIEW === 'rapport' && R) enregistrerAuto(true);
 }
-async function enregistrer(){
+async function enregistrer(force){
   if(CLASSEUR.ecritureEnCours) return;
+  if(force !== true && alerteRapportIncomplet(function(){ enregistrer(true); })) return;
   avantEnregistrement();
   if(!FS_OK) return telechargerClasseur();
-  if(!CLASSEUR.handle) return enregistrerSous();
-  if(!(await autorisation(CLASSEUR.handle, true))){ toast('Accès au classeur refusé : choisissez son emplacement.'); return enregistrerSous(); }
+  if(!CLASSEUR.handle) return enregistrerSous(true);
+  if(!(await autorisation(CLASSEUR.handle, true))){ toast('Accès au classeur refusé : choisissez son emplacement.'); return enregistrerSous(true); }
   await ecrireClasseur(CLASSEUR.handle);
 }
-async function enregistrerSous(){
+async function enregistrerSous(force){
   if(CLASSEUR.ecritureEnCours) return;
+  if(force !== true && alerteRapportIncomplet(function(){ enregistrerSous(true); })) return;
   avantEnregistrement();
   if(!FS_OK) return telechargerClasseur();
   var h;

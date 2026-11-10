@@ -55,6 +55,14 @@ function loadAll(){
   delete MEM['rc.draft'];
   R = dr ? JSON.parse(dr) : newReport();
   migrerIds();   // anciennes données sans identifiant de point : reprise automatique
+  purgerIndiceDef();
+}
+/* La notion d'indice de définition est supprimée : on l'efface des anciennes données. */
+function purgerIndiceDef(){
+  ['gam','ts'].forEach(function(t){ Object.keys(VERS[t]).forEach(function(k){ delete VERS[t][k].indiceDef; }); });
+  HIST.forEach(function(h){ delete h.indiceDef; });
+  REPORTS.forEach(function(r){ delete r.indiceDef; });
+  if(R) delete R.indiceDef;
 }
 function saveDB(){ put('rc.db', JSON.stringify(DB)); }
 function saveReports(){ put('rc.reports', JSON.stringify(REPORTS)); }
@@ -552,7 +560,7 @@ function newReport(){
     qteCommandee:'', qteReceptionnee:'', qteEchantillon:15, dureeControle:'', decision:'',
     origine:'', typeNC:'', sousTypeNC:'',
     commentaires:'',
-    famille:'', gamRev:null, gamStatut:'', gamDateEffet:'', tsRev:null, tsStatut:'', tsDateEffet:'', indiceDef:'',
+    famille:'', gamRev:null, gamStatut:'', gamDateEffet:'', tsRev:null, tsStatut:'', tsDateEffet:'',
     lignes:[], mesures:[], generales:{}, moyens:{}, chartCote:''
   };
 }
@@ -573,7 +581,6 @@ function syncLignes(){
     R.tsRev = vt ? vt.rev : null;
     R.tsStatut = vt ? vt.statut : 'sans révision';
     R.tsDateEffet = vt ? vt.dateEffet : '';
-    R.indiceDef = vt ? (vt.indiceDef || '') : '';
   }
   var n = nbPieces();
   R.mesures = R.lignes.map(function(l){
@@ -704,7 +711,7 @@ function initVersions(){
   });
   DB.ts.forEach(function(t){
     if(VERS.ts[t.article]) return;
-    VERS.ts[t.article] = {rev:0, statut:'applicable', dateEffet:d, valideePar:'Reprise initiale', motif:'Version initiale', indiceDef:'', creeLe:new Date().toISOString()};
+    VERS.ts[t.article] = {rev:0, statut:'applicable', dateEffet:d, valideePar:'Reprise initiale', motif:'Version initiale', creeLe:new Date().toISOString()};
     figer('ts', t.article, 'Version initiale'); n++;
   });
   if(n){ saveVersions(); saveHist(); }
@@ -714,7 +721,7 @@ function initVersions(){
 function figer(type, cle, motif){
   var v = VERS[type][cle]; if(!v) return;
   var e = {type:type, cle:cle, rev:v.rev, dateEffet:v.dateEffet, valideePar:v.valideePar, motif:motif || v.motif || '',
-           indiceDef:v.indiceDef || '', figeeLe:new Date().toISOString(), photo:photo(type, cle)};
+           figeeLe:new Date().toISOString(), photo:photo(type, cle)};
   var f = -1;
   for(var i=0;i<HIST.length;i++) if(HIST[i].type===type && HIST[i].cle===cle && HIST[i].rev===v.rev){ f=i; break; }
   if(f>-1) HIST[f] = e; else HIST.push(e);
@@ -753,10 +760,10 @@ function canon(o){
 function nouvelleRevision(type, cle){
   var v = version(type, cle);
   if(!v){
-    VERS[type][cle] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'', indiceDef:'', creeLe:new Date().toISOString()};
+    VERS[type][cle] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'', creeLe:new Date().toISOString()};
   } else if(v.statut === 'applicable'){
     VERS[type][cle] = {rev:v.rev + 1, statut:'brouillon', dateEffet:'', valideePar:'', motif:'',
-                       indiceDef:v.indiceDef || '', creeLe:new Date().toISOString()};
+                       creeLe:new Date().toISOString()};
   }
   saveVersions();
   journaliser(type, cle, VERS[type][cle].rev, 'Brouillon ouvert', '');
@@ -765,14 +772,10 @@ function nouvelleRevision(type, cle){
 function validerRevision(type, cle){
   var v = version(type, cle);
   if(!v || v.statut !== 'brouillon'){ toast('Aucun brouillon à valider.'); return; }
-  var extra = (type === 'ts')
-    ? '<div style="margin-top:10px"><label>Indice de définition (plan, révision client)<br><input id="v-def" value="'+esc(v.indiceDef||'')+'" style="width:100%;padding:6px;border:1px solid var(--rule)" placeholder="ex. plan rév. D"></label></div>'
-    : '';
   modal('Valider la révision ' + v.rev + ' — ' + cle,
     '<label>Validée par<br><input id="v-par" style="width:100%;padding:6px;border:1px solid var(--rule)" placeholder="Nom du valideur"></label>'
     + '<div style="margin-top:10px"><label>Date d\'effet<br><input type="date" id="v-date" value="'+todayISO()+'" style="width:100%;padding:6px;border:1px solid var(--rule)"></label></div>'
     + '<div style="margin-top:10px"><label>Motif de la révision<br><input id="v-motif" style="width:100%;padding:6px;border:1px solid var(--rule)" placeholder="ex. mise à jour plan client"></label></div>'
-    + extra
     + '<p style="margin:12px 0 0">Une fois validée, cette révision est figée : toute modification ultérieure ouvrira la révision ' + (v.rev+1) + '.</p>',
     function(){}, 'Annuler');
   var ft = document.querySelector('.modal .ft');
@@ -785,8 +788,6 @@ function validerRevision(type, cle){
     if(!par || !mot){ toast('Valideur et motif sont obligatoires.'); return; }
     var anc = v.rev - 1;
     v.valideePar = par; v.motif = mot; v.dateEffet = dt; v.statut = 'applicable';
-    var def = document.getElementById('v-def');
-    if(def) v.indiceDef = def.value.trim();
     saveVersions(); figer(type, cle, mot);
     if(anc >= 0) journaliser(type, cle, anc, 'Révision périmée', 'remplacée par la rév. ' + v.rev);
     document.querySelector('.modal').remove();
@@ -809,7 +810,7 @@ function abandonnerBrouillon(type, cle){
     saveDB();
     VERS[type][cle] = {rev:prec, statut:'applicable', dateEffet:revisionsDe(type,cle)[0] ? null : null, creeLe:new Date().toISOString()};
     var h = revisionsDe(type, cle).filter(function(x){ return x.rev === prec; })[0];
-    if(h){ VERS[type][cle].dateEffet = h.dateEffet; VERS[type][cle].valideePar = h.valideePar; VERS[type][cle].motif = h.motif; VERS[type][cle].indiceDef = h.indiceDef; }
+    if(h){ VERS[type][cle].dateEffet = h.dateEffet; VERS[type][cle].valideePar = h.valideePar; VERS[type][cle].motif = h.motif; }
     HIST = HIST.filter(function(x){ return !(x.type===type && x.cle===cle && x.rev===v.rev); });
     saveHist();
   } else {
@@ -830,7 +831,7 @@ function revisionsApresImport(type, source){
   cles.forEach(function(c){
     var v = version(type, c);
     if(!v){
-      VERS[type][c] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:source, indiceDef:'', creeLe:new Date().toISOString()};
+      VERS[type][c] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:source, creeLe:new Date().toISOString()};
       journaliser(type, c, 0, 'Créée par import', source); n++; return;
     }
     if(v.statut === 'brouillon') return;
@@ -975,7 +976,7 @@ function exportTSLarge(){
   var codes = codesUtilises();
   var head = ['Article'];
   codes.forEach(function(c){ head.push(c, c+' min', c+' max'); });
-  head.push('Révision','Statut','Indice de définition','Date d\'effet');
+  head.push('Révision','Statut','Date d\'effet');
   var rows = [head];
   DB.ts.forEach(function(t){
     var r = [t.article];
@@ -984,7 +985,7 @@ function exportTSLarge(){
       r.push(v?v[0]:'', v?v[1]:'', v?v[2]:'');
     });
     var ver = version('ts', t.article);
-    r.push(ver?ver.rev:'', ver?ver.statut:'', ver?(ver.indiceDef||''):'', ver&&ver.dateEffet?frDate(ver.dateEffet):'');
+    r.push(ver?ver.rev:'', ver?ver.statut:'', ver&&ver.dateEffet?frDate(ver.dateEffet):'');
     rows.push(r);
   });
   download('TS_format-large.csv', toCSV(rows));
@@ -1303,7 +1304,7 @@ function exportRapport(rep){
      'Conforme',t.conforme,'Non conforme',t.nonConforme,'Durée contrôle',rep.dureeControle,'Décision',rep.decision],
     ['Commentaires',rep.commentaires||''],
     ['Gamme',rep.famille||'','Révision gamme',rep.gamRev===null||rep.gamRev===undefined?'':rep.gamRev,
-     'Révision valeurs',rep.tsRev===null||rep.tsRev===undefined?'':rep.tsRev,'Indice de définition',rep.indiceDef||''],
+     'Révision valeurs',rep.tsRev===null||rep.tsRev===undefined?'':rep.tsRev],
     []
   ];
   var gen = rep.generales || {};
@@ -1406,13 +1407,6 @@ function viewRapport(){
     + '<button class="close noprint" id="b-fermer" title="Fermer et revenir aux rapports enregistrés" aria-label="Fermer le rapport">'
     + '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>'
     + '</button></div>';
-  if(ro){
-    h += '<div class="figebar noprint"><span class="lock">🔒</span> Rapport figé — statut <b>'+esc(libDecision(R.decision))+'</b>. '
-      + (statutVerrouille()
-          ? 'Modifiable uniquement après réouverture par un méthodiste.'
-          : 'Modifiez le statut (Accepté / Refusé / Sans décision) pour le débloquer.')
-      + (statutVerrouille() ? '<button class="btn sm" id="b-rouvrir" style="margin-left:auto">Rouvrir (méthodiste)</button>' : '') + '</div>';
-  }
   h += '<div class="hdr">';
   h += champ('Article', '<input list="dl-art" id="f-article" value="'+esc(R.article)+'" placeholder="Saisir ou choisir…" autocomplete="off"'+rdo+'>');
   h += champ('Lot', '<input id="f-lot" value="'+esc(R.lot)+'"'+rdo+'>');
@@ -1531,7 +1525,7 @@ function viewRapport(){
   }
 
   h += '<div class="decprint">'+(R.commentaires?'Commentaires : '+esc(R.commentaires)+'<br>':'')+'Gamme <b>'+esc(R.famille||'—')+'</b> rév. <b>'+(R.gamRev===null||R.gamRev===undefined?'—':R.gamRev)+'</b>'
-     + ' · Valeurs rév. <b>'+(R.tsRev===null||R.tsRev===undefined?'—':R.tsRev)+'</b>'+(R.indiceDef?' ('+esc(R.indiceDef)+')':'')+'<br>'
+     + ' · Valeurs rév. <b>'+(R.tsRev===null||R.tsRev===undefined?'—':R.tsRev)+'</b><br>'
      + 'Décision : <b>'+esc(R.decision||'—')+'</b> · Conforme : <b>'+t.conforme+'</b> · Non conforme : <b>'+t.nonConforme+'</b>'
      + ' · Contrôleur : <b>'+esc(R.controleur)+'</b> · Date : <b>'+frDate(R.date)+'</b></div>';
   var stCls = R.decision==='Accepté'?'dec-a':R.decision==='Refusé'?'dec-r':R.decision==='Attente décision méthodes'?'dec-att':'';
@@ -1541,6 +1535,13 @@ function viewRapport(){
   h += '<select id="f-statut" class="'+stCls+'"'+(statutVerrouille()?' disabled':'')+' style="border:1px solid var(--rule);padding:5px 9px;border-radius:2px">'
     + STATUTS.map(function(s){ return '<option value="'+esc(s)+'"'+(R.decision===s?' selected':'')+'>'+esc(libDecision(s))+'</option>'; }).join('')
     + '</select>';
+  /* Rapport figé : cadenas à droite du statut (plus de bandeau). Accepté / Refusé : clic = réouverture méthodiste. */
+  if(ro){
+    var cad = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+    h += statutVerrouille()
+      ? '<button type="button" class="cadenas" id="b-rouvrir" title="Rapport figé — cliquez pour le rouvrir (méthodiste)" aria-label="Rapport figé — rouvrir (méthodiste)">'+cad+'</button>'
+      : '<span class="cadenas" title="Rapport figé — modifiez le statut pour le débloquer" aria-label="Rapport figé">'+cad+'</span>';
+  }
   if(R.decision === 'Refusé'){
     var subs = []; TYPES_NC.forEach(function(x){ if(x.t === R.typeNC) subs = x.sous; });
     h += '<label class="barlab">Type NC</label>'
@@ -1556,9 +1557,6 @@ function viewRapport(){
   h += '<span class="hint" id="hint-pieces">'+(t.encours?t.encours+' pièce'+(t.encours>1?'s':'')+' non commencée'+(t.encours>1?'s':''):'Toutes les pièces sont renseignées')+'</span>';
   if(R.decision) h += '<span class="stamp '+stampCls+'">'+esc(libDecision(R.decision))+'</span>';
   h += '<span class="sp"></span>';
-  h += '<button class="btn dgr" id="b-eqf" title="Déclarer un écart qualité fournisseur dans X3">Déclarer un EQf X3</button>';
-  if(R.decision === 'Accepté') h += '<button class="btn" id="b-mvtA" title="Changement de stock X3 : statut Q → A">Mouvement X3 statut A</button>';
-  else if(R.decision === 'Refusé') h += '<button class="btn" id="b-mvtR" title="Changement de stock X3 : statut Q → R">Mouvement X3 statut R</button>';
   h += '<button class="btn" id="b-vider"'+dis+'>Vider les mesures</button>';
   h += '<button class="btn" id="b-csv">Exporter en CSV</button>';
   h += '<button class="btn" id="b-print">Imprimer / PDF</button>';
@@ -1573,7 +1571,7 @@ function bandeauRevision(){
     + '<span>Gamme <b>' + esc(R.famille || '—') + '</b> — <b>rév. ' + (R.gamRev === null || R.gamRev === undefined ? '—' : R.gamRev) + '</b>'
     + (R.gamDateEffet ? ' <span class="hint">applicable depuis le ' + frDate(R.gamDateEffet) + '</span>' : '') + '</span>'
     + '<span>Valeurs <b>' + esc(R.article) + '</b> — <b>rév. ' + (R.tsRev === null || R.tsRev === undefined ? '—' : R.tsRev) + '</b>'
-    + (R.indiceDef ? ' <span class="hint">' + esc(R.indiceDef) + '</span>' : '') + '</span>';
+    + '</span>';
   h += '</div>';
 
   var alertes = [];
@@ -1634,8 +1632,6 @@ function docPaneRapport(){
 }
 
 /* ---------- vue historique ---------- */
-/* Information secondaire d'une ligne de la liste, sur la même ligne (lignes fines) */
-function sousInfo(x){ x = String(x||'').trim(); return x ? ' <span class="hint">· ' + esc(x) + '</span>' : ''; }
 function viewHistorique(){
   var list = REPORTS.slice().sort(function(a,b){
     var da = String(a.date||''), db = String(b.date||'');
@@ -1658,13 +1654,16 @@ function viewHistorique(){
   if(!list.length){
     h += '<div class="empty"><b>Aucun rapport enregistré</b>Cliquez sur le bouton « Nouveau rapport » à gauche du titre pour commencer un contrôle.</div>';
   } else {
-    h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Lot / Commande</div><div>Date</div><div>Échantillon</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
+    h += '<div class="rowlist" data-list="rapports"><div class="r head"><div>Article</div><div>Fournisseur</div><div>Lot</div><div>Commande</div><div>Date</div><div>Contrôleur</div><div>Échantillon</div><div>Résultat</div><div>Décision</div><div style="text-align:right">Actions</div></div>';
     list.forEach(function(r){
       var t = totaux2(r);
       h += '<div class="r" data-open="'+r.id+'" tabindex="0" title="Ouvrir ce rapport" data-s="'+esc([r.article,r.lot,r.commande,r.fournisseur,r.controleur,r.decision].join(' ').toLowerCase())+'">'
-        + '<div><b>'+esc(r.article)+'</b>'+sousInfo(r.fournisseur)+'</div>'
-        + '<div>'+esc(r.lot)+sousInfo(r.commande)+'</div>'
-        + '<div>'+frDate(r.date)+sousInfo(r.controleur)+'</div>'
+        + '<div><b>'+esc(r.article)+'</b></div>'
+        + '<div>'+esc(r.fournisseur)+'</div>'
+        + '<div>'+esc(r.lot)+'</div>'
+        + '<div>'+esc(r.commande)+'</div>'
+        + '<div>'+frDate(r.date)+'</div>'
+        + '<div>'+esc(r.controleur)+'</div>'
         + '<div>'+nbPieces2(r)+'</div>'
         + '<div><span style="color:var(--ok);font-weight:700">'+t.conforme+' C</span> / <span style="color:var(--nc);font-weight:700">'+t.nonConforme+' NC</span></div>'
         + '<div><span class="tag '+(r.decision==='Accepté'?'a':r.decision==='Refusé'?'r':r.decision==='Attente décision méthodes'?'att':'d')+'">'+esc(libDecision(r.decision))+'</span></div>'
@@ -1830,7 +1829,7 @@ function barreVersion(type, cle){
   var meta = '';
   if(v && v.statut === 'applicable'){
     meta = '<span class="meta">depuis le ' + frDate(v.dateEffet) + (v.valideePar ? ' · validée par ' + esc(v.valideePar) : '')
-      + (v.motif ? ' · ' + esc(v.motif) : '') + (v.indiceDef ? ' · ' + esc(v.indiceDef) : '') + '</span>';
+      + (v.motif ? ' · ' + esc(v.motif) : '') + '</span>';
   } else if(v){
     meta = '<span class="meta">modification en cours, non applicable tant qu\'elle n\'est pas validée</span>';
   }
@@ -1978,7 +1977,7 @@ function lignesTS(archives){
     codes.forEach(function(g){
       out.push(ligneTS(art, fam, g, vals[g.id], v ? v.rev : null, v ? v.dateEffet : '',
         v ? (v.statut === 'brouillon' ? 'brouillon' : 'valide') : 'valide',
-        v ? v.statut === 'brouillon' : false, v ? (v.indiceDef||'') : ''));
+        v ? v.statut === 'brouillon' : false));
     });
     if(archives){
       revisionsDe('ts', art).forEach(function(hh){
@@ -1986,14 +1985,14 @@ function lignesTS(archives){
         var ph = hh.photo || {};
         codes.forEach(function(g){
           if(!ph[g.id]) return;
-          out.push(ligneTS(art, fam, g, ph[g.id], hh.rev, hh.dateEffet, 'archive', false, hh.indiceDef||''));
+          out.push(ligneTS(art, fam, g, ph[g.id], hh.rev, hh.dateEffet, 'archive', false));
         });
       });
     }
   });
   return out;
 }
-function ligneTS(art, fam, g, val, rev, dateRev, statut, edit, indiceDef){
+function ligneTS(art, fam, g, val, rev, dateRev, statut, edit){
   val = val || ['','',''];
   var nom = num(val[0]), tm = num(val[1]), tp = num(val[2]);
   var brut = String(val[0]===null||val[0]===undefined?'':val[0]).trim();
@@ -2005,7 +2004,7 @@ function ligneTS(art, fam, g, val, rev, dateRev, statut, edit, indiceDef){
     maxi:(na||vide||isNaN(nom))?null:nom+(isNaN(tp)?0:tp),
     type: brut === '-' ? 'non applicable' : (vide || isNaN(nom)) ? '' : (nom===1 && tm===0 && tp===0) ? 'Booléen' : 'Valeur',
     typeSpec: String(val[3]===undefined||val[3]===null?'':val[3]).trim(),
-    rev:rev, dateRev:dateRev, statut:statut, edit:edit, indiceDef:indiceDef
+    rev:rev, dateRev:dateRev, statut:statut, edit:edit
   };
 }
 
@@ -2150,7 +2149,6 @@ function validerBrouillons(type, cles){
     '<label>Validée par<br><input id="v-par" style="width:100%;padding:6px;border:1px solid var(--rule)" placeholder="Nom du valideur"></label>'
     + '<div style="margin-top:10px"><label>Date d\'effet<br><input type="date" id="v-date" value="'+todayISO()+'" style="width:100%;padding:6px;border:1px solid var(--rule)"></label></div>'
     + '<div style="margin-top:10px"><label>Motif de la révision<br><input id="v-motif" style="width:100%;padding:6px;border:1px solid var(--rule)" placeholder="ex. mise à jour plan client"></label></div>'
-    + (type === 'ts' ? '<div style="margin-top:10px"><label>Indice de définition (vide = conserver celui de chaque article)<br><input id="v-def" style="width:100%;padding:6px;border:1px solid var(--rule)" placeholder="ex. plan rév. D"></label></div>' : '')
     + '<p style="margin:12px 0 0">Concernés : ' + esc(cles.slice(0,6).join(', ')) + (cles.length>6 ? ' … (+' + (cles.length-6) + ')' : '') + '.</p>',
     function(){}, 'Annuler');
   var ft = document.querySelector('.modal .ft');
@@ -2160,13 +2158,11 @@ function validerBrouillons(type, cles){
     var par = document.getElementById('v-par').value.trim();
     var mot = document.getElementById('v-motif').value.trim();
     var dt = document.getElementById('v-date').value;
-    var defEl = document.getElementById('v-def'), def = defEl ? defEl.value.trim() : '';
     if(!par || !mot){ toast('Valideur et motif sont obligatoires.'); return; }
     cles.forEach(function(c){
       var v = version(type, c);
       if(!v || v.statut !== 'brouillon') return;
       v.valideePar = par; v.motif = mot; v.dateEffet = dt; v.statut = 'applicable';
-      if(def) v.indiceDef = def;
       figer(type, c, mot);
       if(v.rev > 0) journaliser(type, c, v.rev - 1, 'Révision archivée', 'remplacée par la rév. ' + v.rev);
     });
@@ -2349,7 +2345,7 @@ function creerArticle(){
     var va = version('ts', a);
     if(va && va.statut === 'applicable') nouvelleRevision('ts', a);
     else if(!va)
-      VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', indiceDef:'', creeLe:new Date().toISOString()};
+      VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', creeLe:new Date().toISOString()};
     var n = preparerTS(a, mod.value);
     saveDB(); saveVersions(); journaliser('ts', a, version('ts', a).rev, 'Article créé', 'famille ' + f + (mod.value ? ', valeurs copiées de ' + mod.value : ''));
     document.querySelector('.modal').remove();
@@ -2379,7 +2375,7 @@ function choisirFamille(a){
     if(m) m.famille = f; else DB.matrice.push({article:a, fournisseur:'', famille:f});
     var n = 0, v = version('ts', a);
     if(!v || v.statut === 'brouillon'){
-      if(!v) VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', indiceDef:'', creeLe:new Date().toISOString()};
+      if(!v) VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', creeLe:new Date().toISOString()};
       n = preparerTS(a);
       saveVersions();
     }
@@ -2412,10 +2408,10 @@ function psetRevisions(){
 
   var revs = revisionsDe(VTYPE, VCLE);
   var v = version(VTYPE, VCLE);
-  var courant = v && v.statut === 'brouillon' ? [{rev:v.rev, brouillon:true, dateEffet:'', valideePar:'', motif:v.motif||'', indiceDef:v.indiceDef||''}] : [];
+  var courant = v && v.statut === 'brouillon' ? [{rev:v.rev, brouillon:true, dateEffet:'', valideePar:'', motif:v.motif||''}] : [];
   var lignes = courant.concat(revs);
   h += '<table class="grid" data-tbl="rev"><thead><tr><th style="width:80px">Révision</th><th style="width:110px">Date d\'effet</th>'
-     + '<th style="width:150px">Validée par</th><th>Motif</th>' + (VTYPE==='ts' ? '<th style="width:150px">Indice de définition</th>' : '')
+     + '<th style="width:150px">Validée par</th><th>Motif</th>'
      + '<th style="width:130px">Rapports liés</th><th style="width:110px"></th></tr></thead><tbody>';
   lignes.forEach(function(r){
     var lies = REPORTS.filter(function(x){
@@ -2426,7 +2422,6 @@ function psetRevisions(){
       + '<td style="padding:6px 9px">'+(r.dateEffet?frDate(r.dateEffet):'—')+'</td>'
       + '<td style="padding:6px 9px">'+esc(r.valideePar||'—')+'</td>'
       + '<td style="padding:6px 9px">'+esc(r.motif||'—')+'</td>'
-      + (VTYPE==='ts' ? '<td style="padding:6px 9px">'+esc(r.indiceDef||'—')+'</td>' : '')
       + '<td style="padding:6px 9px">'+(lies?lies+' rapport'+(lies>1?'s':''):'<span class="hint">aucun</span>')+'</td>'
       + '<td class="act">'+(r.rev>0?'<button class="btn sm" data-cmp="'+r.rev+'">Comparer à '+(r.rev-1)+'</button>':'')+'</td></tr>';
   });
@@ -2696,14 +2691,6 @@ function bindRapport(){
     if(mdp !== '1'){ toast('Mot de passe incorrect.'); return; }
     R.decision = ''; enregistrerAuto(true); render(); toast('Rapport rouvert (statut : sans décision).');
   };
-  /* Déclaration d'un EQf dans X3 (message + acquittement) */
-  var eqf = document.getElementById('b-eqf');
-  if(eqf) eqf.onclick = function(){ modal('EQf X3', '<p style="margin:0">Génère un EQf dans X3</p>', null, 'Acquitter'); };
-  /* Mouvements de stock X3 selon la décision */
-  var mvA = document.getElementById('b-mvtA');
-  if(mvA) mvA.onclick = function(){ modal('Mouvement X3 — statut A', '<p style="margin:0">Génère un changement de stock X3 du statut Q au statut A</p>', null, 'Acquitter'); };
-  var mvR = document.getElementById('b-mvtR');
-  if(mvR) mvR.onclick = function(){ modal('Mouvement X3 — statut R', '<p style="margin:0">Génère un changement de stock X3 du statut Q au statut R</p>', null, 'Acquitter'); };
   /* Numéros de moyen de contrôle (par point) */
   document.querySelectorAll('input.cmoy, input.genmoy').forEach(function(el){
     el.oninput = function(){ R.moyens = R.moyens || {}; R.moyens[el.dataset.moy] = el.value; enregistrerAuto(); };
@@ -2872,12 +2859,34 @@ function enregistrerAuto(immediat){
 function etatSauvegarde(){
   var m = champsManquants();
   if(m.length) return '<span class="ko">Non enregistré — ' + m.map(function(c){ return esc(c.nom); }).join(', ') + ' à renseigner</span>';
-  if(estModifie()) return '<span class="aen">Rapport complet — à enregistrer dans le classeur (Ctrl+S)</span>';
+  if(estModifie()) return '';
   return '<span class="okk">Enregistré dans le classeur</span>';
 }
 function majEtatSauvegarde(){
   var e = document.getElementById('etat-save');
   if(e) e.innerHTML = etatSauvegarde();
+}
+/* Clic sur Enregistrer (ou Ctrl+S) avec un rapport ouvert incomplet : alerte « Rapport non enregistré ».
+   Renvoie true si l'alerte est affichée ; « Enregistrer quand même » relance suite() (le rapport reste en brouillon). */
+function alerteRapportIncomplet(suite){
+  if(VIEW !== 'rapport' || !R) return false;
+  var manque = champsManquants();
+  if(!manque.length) return false;
+  modal('Rapport non enregistré',
+    'Ce rapport ne peut pas être enregistré tant qu\'il manque :'
+    + '<ul>' + manque.map(function(c){ return '<li><b>' + esc(c.nom) + '</b></li>'; }).join('') + '</ul>'
+    + '<p style="margin:12px 0 0">Complétez ces champs, puis enregistrez de nouveau.</p>',
+    function(){}, 'Compléter');
+  var ft = document.querySelector('.modal .ft');
+  ft.innerHTML = '<button class="btn" data-x4>Enregistrer quand même</button><button class="btn pri" data-ok4>Compléter</button>';
+  ft.querySelector('[data-x4]').onclick = function(){ document.querySelector('.modal').remove(); suite(); };
+  ft.querySelector('[data-ok4]').onclick = function(){
+    document.querySelector('.modal').remove();
+    manque.forEach(function(c){ var el = document.getElementById(c.id); if(el) el.classList.add('miss'); });
+    var first = document.getElementById(manque[0].id);
+    if(first){ first.focus(); if(first.select) first.select(); }
+  };
+  return true;
 }
 /* Fermeture du rapport : retour aux rapports enregistrés */
 function fermerRapport(cible){
@@ -3013,7 +3022,7 @@ function bindParametres(){
       if(el.dataset.b === 'matrice' && (el.dataset.f === 'famille' || el.dataset.f === 'article')){
         var a = String(DB.matrice[+el.dataset.i].article||'').trim(), v = a ? version('ts', a) : null;
         if(a && gammeDe(familleOf(a)).length && (!v || v.statut === 'brouillon')){
-          if(!v) VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', indiceDef:'', creeLe:new Date().toISOString()};
+          if(!v) VERS.ts[a] = {rev:0, statut:'brouillon', dateEffet:'', valideePar:'', motif:'Création de l\'article', creeLe:new Date().toISOString()};
           var n = preparerTS(a);
           if(n){ saveVersions(); saveDB(); syncLignes(); saveDraft(); toast(a + ' : ' + n + ' point' + (n>1?'s':'') + ' de la gamme ajouté' + (n>1?'s':'') + ' dans TS, valeurs à saisir.'); }
         }
@@ -3143,9 +3152,9 @@ function bindParametres(){
    Paramètres : petite fenêtre flottante en haut à droite, ouverte par la
    roue crantée du ruban au-dessus de l'écran en cours (sans le quitter).
    ======================================================================= */
-var PARAM_OUVERT = false, PARAM_ONGLET = 'sauvegarde';
+var PARAM_OUVERT = false, PARAM_ONGLET = 'affichage';
 function ouvrirParametres(onglet){
-  if(onglet) PARAM_ONGLET = onglet;
+  PARAM_ONGLET = onglet || 'affichage';   // à l'ouverture : onglet Affichage d'abord
   PARAM_OUVERT = true; rendrePanneauParam();
   var p = document.getElementById('panneau-param'); if(p) p.focus();
 }
@@ -3170,7 +3179,7 @@ function rendrePanneauParam(){
     + '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>'
     + '</button></div>'
     + '<div class="tabs">'
-    + [['sauvegarde','Sauvegarde'],['affichage','Affichage']].map(function(o){
+    + [['affichage','Affichage'],['sauvegarde','Sauvegarde']].map(function(o){
         return '<button data-ponglet="' + o[0] + '" aria-current="' + (PARAM_ONGLET === o[0]) + '">' + o[1] + '</button>';
       }).join('')
     + '</div><div class="pp-corps">' + (PARAM_ONGLET === 'affichage' ? psetAffichage() : psetSauvegarde()) + '</div>';
