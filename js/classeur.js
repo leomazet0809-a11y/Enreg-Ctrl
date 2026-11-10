@@ -31,19 +31,6 @@ var FEUILLE_DONNEES = '_Donnees';
 var TAILLE_PART = 30000;  // une cellule Excel accepte au plus 32 767 caractères
 var NOM_DEFAUT = 'Enregistrements-Controles.xlsx';
 var FS_OK = typeof window.showSaveFilePicker === 'function' && typeof window.showOpenFilePicker === 'function';
-/* Accès direct aux fichiers refusé par le navigateur (souvent une stratégie de sécurité de l'entreprise) :
-   l'application passe en mode copie (ouverture par sélection, enregistrement par téléchargement). */
-function accesFichiersBloque(e){ return !!e && (e.name === 'SecurityError' || e.name === 'NotAllowedError' || e.name === 'TypeError'); }
-function passerEnModeCopie(e){
-  FS_OK = false;
-  modal('Accès direct aux fichiers bloqué',
-    '<p style="margin:0">Le navigateur refuse que l\'application lise ou écrive directement un fichier de votre PC '
-    + '(souvent une règle de sécurité de l\'entreprise).</p>'
-    + '<p style="margin:10px 0 0">L\'application continue en <b>mode copie</b> : vous choisissez le classeur à ouvrir, '
-    + 'et chaque enregistrement <b>télécharge une copie</b> du classeur (dossier Téléchargements), à replacer ensuite dans votre dossier.</p>'
-    + '<p class="hint" style="margin:10px 0 0">Pour l\'enregistrement direct, demandez à votre service informatique d\'autoriser l\'accès aux fichiers '
-    + '(« File System Access ») pour Edge ou Chrome. Détail : ' + esc(e && (e.message || e.name) || '') + '</p>');
-}
 var TYPES_XLSX = [{description:'Classeur Excel', accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}];
 
 var ICONES = {
@@ -443,7 +430,6 @@ async function enregistrerSous(force){
     h = await window.showSaveFilePicker({suggestedName: CLASSEUR.nom || NOM_DEFAUT, types: TYPES_XLSX, id:'enreg-ctrl'});
   }catch(e){
     if(e && e.name === 'AbortError') return;
-    if(accesFichiersBloque(e)){ passerEnModeCopie(e); return telechargerClasseur(); }
     toast('Choix de l\'emplacement impossible : ' + (e.message || e.name)); return;
   }
   CLASSEUR.handle = h; CLASSEUR.nom = h.name; CLASSEUR.dateFichier = 0; CLASSEUR.dossier = null;
@@ -607,11 +593,7 @@ async function ouvrirClasseur(){
   }
   var hs;
   try{ hs = await window.showOpenFilePicker({types: TYPES_XLSX, id:'enreg-ctrl', multiple:false}); }
-  catch(e){
-    if(e && e.name === 'AbortError') return;
-    if(accesFichiersBloque(e)){ passerEnModeCopie(e); return ouvrirClasseur(); }
-    toast('Ouverture impossible : ' + (e.message || e.name)); return;
-  }
+  catch(e){ if(!e || e.name !== 'AbortError') toast('Ouverture impossible : ' + (e.message || e.name)); return; }
   CLASSEUR.dossier = null;
   await chargerDepuisHandle(hs[0]);
 }
@@ -695,32 +677,6 @@ function appliquerTheme(t){
 var LOGO = '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--accent)"/>'
   + '<path d="M10 9.5h9M10 14h12M10 18.5h6" stroke="var(--accent-ink)" stroke-width="2" stroke-linecap="round"/>'
   + '<path d="M17.5 22l2.3 2.3 4.7-4.8" fill="none" stroke="var(--accent-ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-/* ---------- erreurs inattendues : toujours affichées, avec le détail à transmettre ---------- */
-function afficherErreurInattendue(texte){
-  try{
-    var deja = document.querySelector('.modal'); if(deja && deja.getAttribute('data-erreur')) return;
-    modal('Erreur de l\'application',
-      '<p style="margin:0">Une erreur empêche l\'application de continuer.</p>'
-      + '<p style="margin:10px 0 0">Faites une capture de cette fenêtre et transmettez-la.</p>'
-      + '<pre class="diag">' + esc(texte) + '\n\n' + esc(diagnostic()) + '</pre>');
-    var m = document.querySelector('.modal'); if(m) m.setAttribute('data-erreur', '1');
-  }catch(e){ alert('Erreur de l\'application : ' + texte); }
-}
-function diagnostic(){
-  return 'Navigateur : ' + navigator.userAgent
-    + '\nPage : ' + location.protocol + ' · contexte sécurisé : ' + (window.isSecureContext ? 'oui' : 'non')
-    + '\nAccès aux fichiers : ' + (FS_OK ? 'oui' : 'non') + ' · classeur : ' + (CLASSEUR.nom || 'aucun')
-    + '\nVersion : ' + ((document.querySelector('script[src*="classeur.js"]')||{}).src || '').split('?v=')[1];
-}
-window.addEventListener('error', function(e){
-  if(!e || (!e.error && !e.message)) return;                // ressource non chargée (ex. police) : sans effet
-  afficherErreurInattendue((e.error && (e.error.stack || e.error.message)) || e.message);
-});
-window.addEventListener('unhandledrejection', function(e){
-  var r = e && e.reason; if(r && r.name === 'AbortError') return;   // choix de fichier annulé
-  afficherErreurInattendue(r ? (r.stack || r.message || r.name || String(r)) : 'promesse rejetée');
-});
 
 /* ---------- branchements globaux ---------- */
 (function(){
