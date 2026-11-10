@@ -6,12 +6,17 @@ Tout le projet est enregistré dans un **classeur Excel (.xlsx)** dont vous choi
 
 ## Démarrer
 
-1. Téléchargez le dossier de l'application (bouton vert **Code → Download ZIP** sur GitHub), puis décompressez-le.
-2. Ouvrez le fichier **`index.html`** avec **Google Chrome** ou **Microsoft Edge** (double-clic, ou clic droit → *Ouvrir avec*).
-3. À l'accueil, choisissez :
-   - **Créer un nouveau classeur…** : indiquez le dossier et le nom du fichier Excel (par exemple sur un lecteur réseau partagé) ;
-   - **Ouvrir un classeur existant…** : sélectionnez un classeur déjà créé par l'application ;
-   - **Reprendre « … »** : rouvre directement le dernier classeur utilisé sur ce poste.
+Deux façons d'ouvrir l'application, avec **Google Chrome** ou **Microsoft Edge** :
+
+- **En ligne** : https://leomazet0809-a11y.github.io/Enreg-Ctrl/ (le classeur reste sur votre PC, rien n'est envoyé sur internet). Dans Edge, menu *… → Applications → Installer ce site en tant qu'application* pour l'avoir comme un logiciel.
+- **Depuis le dossier téléchargé** (bouton vert **Code → Download ZIP** sur GitHub, puis clic droit → *Extraire tout…*) : double-cliquez sur **`Lancer l'application.bat`**. Une petite fenêtre noire s'ouvre (laissez-la ouverte, vous pouvez la réduire) et l'application s'ouvre dans le navigateur à l'adresse `http://localhost:8765`. Fermez la fenêtre noire pour arrêter.
+
+> N'ouvrez pas directement `index.html` par double-clic : ouverte depuis un fichier (adresse `C:/…/index.html`), la page ne peut pas enregistrer dans le classeur (le navigateur ne répond pas à la demande d'écriture).
+
+À l'accueil, choisissez :
+- **Créer un nouveau classeur…** : indiquez le dossier et le nom du fichier Excel (par exemple sur un lecteur réseau partagé) ;
+- **Ouvrir un classeur existant…** : sélectionnez un classeur déjà créé par l'application ;
+- **Reprendre « … »** : rouvre directement le dernier classeur utilisé sur ce poste.
 
 > Le navigateur demande l'autorisation de modifier le fichier : acceptez-la.
 
@@ -130,6 +135,6 @@ L'application peut aussi être publiée avec **GitHub Pages** (Settings → Page
 
 ## Pour information technique
 
-- Application statique : `index.html`, `css/app.css`, `js/app.js` (logique métier), `js/classeur.js` (lecture / écriture du classeur), `js/partage.js` (travail à plusieurs), `js/infobulle.js` (info-bulles).
+- Application statique : `index.html`, `Lancer l'application.bat` + `outils/serveur-local.ps1` (petit serveur web local en PowerShell, sans installation), `css/app.css`, `js/app.js` (logique métier), `js/classeur.js` (lecture / écriture du classeur), `js/partage.js` (travail à plusieurs), `js/infobulle.js` (info-bulles).
 - Lecture et écriture Excel : bibliothèque [SheetJS](https://sheetjs.com) incluse dans `lib/` (fonctionne sans connexion internet).
 - Accès au fichier : API *File System Access* de Chrome / Edge. Dans un autre navigateur, chaque enregistrement télécharge une copie du classeur.
