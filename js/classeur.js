@@ -549,6 +549,16 @@ function abandonnerModifications(){
 async function chargerDepuisHandle(h, rechargement){
   try{
     var f = await h.getFile();
+    /* fichier vide (0 octet) : emplacement choisi mais classeur jamais écrit -> on y crée le projet */
+    if(!f.size){
+      appliquerDonnees(null, h, h.name);
+      CLASSEUR.dateFichier = f.lastModified;
+      idbEcrire('classeur', h);
+      CLASSEUR.modifie = true; majBarreFichier();
+      toast('Le classeur ' + h.name + ' était vide : le projet y est créé.');
+      await enregistrer();
+      return true;
+    }
     var bilan = appliquerDonnees(lireClasseur(await f.arrayBuffer()), h, h.name);
     CLASSEUR.dateFichier = f.lastModified;
     idbEcrire('classeur', h);
@@ -558,9 +568,19 @@ async function chargerDepuisHandle(h, rechargement){
     return true;
   }catch(e){
     modal('Ouverture impossible', 'Le classeur <b>' + esc(h.name) + '</b> n\'a pas pu être lu.'
-      + '<p style="margin:10px 0 0">' + esc(e && (e.message || e.name) || 'erreur inconnue') + '</p>');
+      + '<p style="margin:10px 0 0">' + conseilOuverture(e) + '</p>'
+      + '<p class="hint" style="margin:10px 0 0">Détail : ' + esc(e && (e.message || e.name) || 'erreur inconnue') + '</p>');
     return false;
   }
+}
+/* Explication et solution, selon l'erreur de lecture */
+function conseilOuverture(e){
+  var n = e && e.name || '', m = String(e && e.message || '');
+  if(n === 'NotReadableError') return 'Le fichier est probablement <b>ouvert dans Excel</b> (ou en cours de synchronisation OneDrive) : fermez-le dans Excel, puis réessayez.';
+  if(n === 'NotFoundError') return 'Le fichier a été <b>déplacé, renommé ou supprimé</b> : choisissez-le de nouveau avec « Ouvrir un classeur existant… ».';
+  if(n === 'NotAllowedError' || n === 'SecurityError') return 'Le navigateur n\'a pas l\'autorisation de lire ce fichier : réessayez et acceptez la demande d\'accès.';
+  if(/ne contient ni/.test(m)) return 'Ce classeur n\'a pas été créé par l\'application et n\'a pas d\'onglet GAMSERIE, TS ou Matrice. Créez un nouveau classeur depuis l\'accueil, puis copiez vos données dans ses onglets.';
+  return 'Le fichier n\'est pas un classeur Excel lisible (.xlsx), ou il est endommagé. Vérifiez qu\'il s\'ouvre dans Excel.';
 }
 async function ouvrirClasseur(){
   if(!abandonnerModifications()) return;
