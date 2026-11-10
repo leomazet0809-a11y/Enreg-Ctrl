@@ -654,6 +654,9 @@ async function afficherAccueil(auDemarrage){
     + '<button class="acc-btn" id="acc-nouveau">' + ICONES.plus + '<span><b>Créer un nouveau classeur…</b><small>Choisissez le dossier et le nom du fichier</small></span></button>'
     + '</div>'
     + '<button class="acc-lien" id="acc-demo">Découvrir l\'application sans classeur (données de démonstration)</button>';
+  if(location.protocol === 'file:') h += '<p class="acc-alerte"><b>Application ouverte directement depuis le fichier index.html</b> : '
+    + 'le navigateur risque de bloquer l\'enregistrement dans le classeur. Fermez cette page et double-cliquez plutôt sur '
+    + '<b>« Lancer l\'application.bat »</b> dans le dossier de l\'application, ou utilisez la version en ligne.</p>';
   if(!FS_OK) h += '<p class="acc-alerte">Ce navigateur ne permet pas d\'écrire directement dans un fichier : chaque enregistrement téléchargera une copie du classeur. Utilisez <b>Google Chrome</b> ou <b>Microsoft Edge</b> pour enregistrer à l\'emplacement de votre choix.</p>';
   h += '</div>';
   a.innerHTML = h;
